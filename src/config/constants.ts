@@ -33,8 +33,8 @@ export const DRIFT_COOLDOWN = 0.15;
 export const ITEM_GUST_STEER_LOCK = 0.6;     // seconds
 export const ITEM_WOBBLE_DURATION = 1.2;      // seconds
 export const ITEM_WOBBLE_SPEED_MULT = 0.5;
-export const ITEM_TURBO_DURATION = 1.5;       // seconds
-export const ITEM_TURBO_MULTIPLIER = 1.35;
+export const ITEM_TURBO_DURATION = 2.5;       // seconds
+export const ITEM_TURBO_MULTIPLIER = 1.55;
 
 // ── Race ─────────────────────────────────────────────────
 export const TOTAL_LAPS = 3;
@@ -44,6 +44,25 @@ export const COUNTDOWN_DURATION = 3; // seconds
 // ── Track ────────────────────────────────────────────────
 export const ROAD_WIDTH = 18;       // wide enough for side-by-side racing
 export const ROAD_SEGMENTS = 200;   // resolution of road mesh
+
+// ── Obstacles ──────────────────────────────────────────────
+// Gate
+export const GATE_PILLAR_WIDTH = 1.5;
+export const GATE_PILLAR_HEIGHT = 4;
+export const GATE_HIT_SPEED_FACTOR = 0.4;        // keep 40% speed
+export const GATE_HIT_PUSH_FORCE = 10;
+export const GATE_BOOST_DURATION = 0.8;
+export const GATE_COLLISION_DEPTH = 1.5;
+
+// Hammer
+export const HAMMER_HEAD_RADIUS = 2.0;
+export const HAMMER_SWING_PERIOD = 3.0;           // seconds per full cycle
+export const HAMMER_KNOCKBACK_SPEED = 25;
+export const HAMMER_KNOCKBACK_DECAY = 0.92;       // per-frame at 60Hz
+export const HAMMER_HIT_SPEED_FACTOR = 0.2;       // keep 20% speed
+export const HAMMER_STUN_DURATION = 0.8;
+export const HAMMER_POLE_HEIGHT = 6;
+export const HAMMER_ARM_LENGTH = 8;
 
 // ── Rendering ────────────────────────────────────────────
 export const VOXEL_SIZE = 0.3;

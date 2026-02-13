@@ -116,6 +116,7 @@ function startRace(): void {
   scene.setupKarts(race.karts);
   scene.setupItemBoxes(race.itemSystem.boxes);
   scene.setupButterflies(race.butterflySystem.butterflies);
+  scene.setupObstacles(race.obstacleSystem.obstacles);
 
   // Pre-compute minimap points
   minimapPoints = computeMinimapPoints(track);
@@ -185,6 +186,14 @@ function gameLoop(time: number): void {
         }
       }
 
+      // Obstacle events (toast for human kart only)
+      const obsEvents = race.obstacleSystem.drainEvents();
+      for (const evt of obsEvents) {
+        if (evt.kartId === race.humanKart.id) {
+          pendingToast = evt.message;
+        }
+      }
+
       accumulator -= FIXED_DT;
     }
   }
@@ -203,6 +212,7 @@ function gameLoop(time: number): void {
     if (collected.length > 0) scene.removeButterflies(collected);
     scene.updateButterflies(race.raceTime);
     scene.updateItemBoxes(race.itemSystem.boxes, race.raceTime);
+    scene.updateObstacles(race.obstacleSystem.obstacles, race.raceTime);
 
     scene.updateFrame(race.karts, race.humanKart, dt);
     scene.render();

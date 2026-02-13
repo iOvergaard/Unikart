@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { VOXEL_SIZE } from '../config/constants';
+import { VOXEL_SIZE, GATE_PILLAR_WIDTH, GATE_PILLAR_HEIGHT } from '../config/constants';
 import { CharacterDef } from '../config/characters';
 
 interface Voxel {
@@ -506,6 +506,96 @@ export function createFlowerPatch(): THREE.Group {
     head.rotation.y = Math.random() * Math.PI;
     group.add(head);
   }
+
+  return group;
+}
+
+// ── Obstacle models ──
+
+/** Create a gate frame spanning the road. 4 pillars + top beam + boost ground stripe */
+export function createGateFrame(roadWidth: number, boostSlot: number): THREE.Group {
+  const group = new THREE.Group();
+  const pillarColor = 0x8844cc; // purple crystal
+  const beamColor = 0x9955dd;
+  const boostColor = 0x44ff88;
+
+  const pillarMat = new THREE.MeshLambertMaterial({ color: pillarColor });
+  const beamMat = new THREE.MeshLambertMaterial({ color: beamColor });
+  const halfWidth = roadWidth / 2;
+
+  // 4 pillars along the right vector (x-axis in local space)
+  const pillarGeo = new THREE.BoxGeometry(GATE_PILLAR_WIDTH, GATE_PILLAR_HEIGHT, GATE_PILLAR_WIDTH);
+  for (let i = 0; i < 4; i++) {
+    const x = -halfWidth + (i / 3) * roadWidth;
+    const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+    pillar.position.set(x, GATE_PILLAR_HEIGHT / 2, 0);
+    group.add(pillar);
+  }
+
+  // Top beam connecting all pillars
+  const beamGeo = new THREE.BoxGeometry(roadWidth + GATE_PILLAR_WIDTH, 0.8, GATE_PILLAR_WIDTH * 0.8);
+  const beam = new THREE.Mesh(beamGeo, beamMat);
+  beam.position.set(0, GATE_PILLAR_HEIGHT + 0.4, 0);
+  group.add(beam);
+
+  // Boost slot ground stripe
+  const slotWidth = roadWidth / 3;
+  const slotX = -halfWidth + boostSlot * slotWidth + slotWidth / 2;
+  const stripeGeo = new THREE.PlaneGeometry(slotWidth * 0.8, 3);
+  stripeGeo.rotateX(-Math.PI / 2);
+  const stripeMat = new THREE.MeshLambertMaterial({
+    color: boostColor,
+    transparent: true,
+    opacity: 0.6,
+  });
+  const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+  stripe.name = 'boostStripe';
+  stripe.position.set(slotX, 0.03, 0);
+  group.add(stripe);
+
+  return group;
+}
+
+/** Create a swinging hammer. Returns group with pole + armPivot (child named "armPivot") */
+export function createHammer(): THREE.Group {
+  const group = new THREE.Group();
+
+  const poleMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
+  const armMat = new THREE.MeshLambertMaterial({ color: 0x666666 });
+  const headMat = new THREE.MeshLambertMaterial({ color: 0xcc3333 });
+  const counterMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
+
+  // Short ground base
+  const baseHeight = 1.5;
+  const poleGeo = new THREE.CylinderGeometry(0.6, 0.8, baseHeight, 8);
+  const pole = new THREE.Mesh(poleGeo, poleMat);
+  pole.position.y = baseHeight / 2;
+  group.add(pole);
+
+  // Arm pivot at street level (kart height)
+  const armPivot = new THREE.Group();
+  armPivot.name = 'armPivot';
+  armPivot.position.y = baseHeight;
+  group.add(armPivot);
+
+  // Horizontal arm
+  const armLength = 8;
+  const armGeo = new THREE.BoxGeometry(armLength, 0.8, 0.8);
+  const arm = new THREE.Mesh(armGeo, armMat);
+  arm.position.x = 0; // centered on pivot
+  armPivot.add(arm);
+
+  // Hammer head (at one end of arm) — chunky and visible
+  const headGeo = new THREE.BoxGeometry(2.5, 3, 2.5);
+  const head = new THREE.Mesh(headGeo, headMat);
+  head.position.set(armLength / 2, 0, 0);
+  armPivot.add(head);
+
+  // Small counterweight (at other end)
+  const counterGeo = new THREE.BoxGeometry(1.2, 1.5, 1.2);
+  const counter = new THREE.Mesh(counterGeo, counterMat);
+  counter.position.set(-armLength / 2, 0, 0);
+  armPivot.add(counter);
 
   return group;
 }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ObstacleDef } from './obstacles';
 
 export interface TrackControlPoint {
   position: THREE.Vector3;
@@ -25,6 +26,7 @@ export interface TrackDef {
   controlPoints: TrackControlPoint[];
   zones: TrackZone[];
   sceneryZones?: SceneryZone[];
+  obstacles?: ObstacleDef[];
   available: boolean;
 }
 
@@ -73,6 +75,10 @@ function rainbowMeadow(): TrackDef {
     sceneryZones: [
       // Dense forest after the drift zone, before the wide finish approach
       { start: 0.72, end: 0.88, type: 'forest' },
+    ],
+    obstacles: [
+      { type: 'gate', t: 0.25, boostSlot: Math.floor(Math.random() * 3) },
+      { type: 'hammer', t: 0.47 },
     ],
     available: true,
   };

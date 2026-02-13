@@ -7,7 +7,7 @@ import {
   BASE_STEERING_SPEED, BASE_FRICTION, BASE_WEIGHT,
   OFFROAD_SPEED_MULTIPLIER, OFFROAD_DURING_BOOST_MULTIPLIER,
   DRIFT_STEERING_MULTIPLIER, DRIFT_FRICTION_MULTIPLIER,
-  KART_COLLISION_RADIUS,
+  KART_COLLISION_RADIUS, HAMMER_KNOCKBACK_DECAY,
 } from '../config/constants';
 
 export class Kart {
@@ -42,6 +42,10 @@ export class Kart {
   wobbleTimer = 0;    // speed reduced
   turboTimer = 0;     // external boost
   spinAngle = 0;      // visual spin from gust
+
+  // Obstacle effects
+  knockbackVelocity = new THREE.Vector3(); // hammer pushback
+  hammerStunTimer = 0; // reduces steering to 30%
 
   // Butterfly collection
   butterflies = 0;
@@ -97,6 +101,10 @@ export class Kart {
       this.wobbleTimer -= dt;
       // Speed reduction handled via effective max speed
     }
+    if (this.hammerStunTimer > 0) {
+      this.hammerStunTimer -= dt;
+      steerInput *= 0.3;
+    }
 
     // ── Drift system ──
     if (driftHeld && !this.drift.isCharging && !this.drift.isBoosting && this.speed > 5) {
@@ -141,6 +149,14 @@ export class Kart {
     const fwd = this.forward;
     this.velocity.copy(fwd).multiplyScalar(this.speed);
     this.position.add(this.velocity.clone().multiplyScalar(dt));
+
+    // ── Knockback (obstacle) ──
+    if (this.knockbackVelocity.lengthSq() > 0.01) {
+      this.position.add(this.knockbackVelocity.clone().multiplyScalar(dt));
+      this.knockbackVelocity.multiplyScalar(Math.pow(HAMMER_KNOCKBACK_DECAY, dt * 60));
+    } else {
+      this.knockbackVelocity.set(0, 0, 0);
+    }
 
     // Keep on ground plane
     this.position.y = 0;
@@ -213,6 +229,8 @@ export class Kart {
     this.gustTimer = 0;
     this.wobbleTimer = 0;
     this.turboTimer = 0;
+    this.knockbackVelocity.set(0, 0, 0);
+    this.hammerStunTimer = 0;
     this.drift = new DriftBoost();
   }
 }

@@ -5,6 +5,7 @@ import { AiController, AiInput } from '../ai/ai-controller';
 import { DifficultyProfile, DIFFICULTY_PROFILES } from '../ai/difficulty';
 import { ItemSystem } from './item-system';
 import { ButterflySystem } from './butterfly-system';
+import { ObstacleSystem } from './obstacle-system';
 import { resolveCollisions } from '../physics/collision';
 import { CharacterDef, CHARACTERS } from '../config/characters';
 import { Difficulty } from '../core/game-state';
@@ -18,6 +19,7 @@ export class RaceManager {
   aiControllers: AiController[] = [];
   itemSystem: ItemSystem;
   butterflySystem: ButterflySystem;
+  obstacleSystem: ObstacleSystem;
 
   raceTime = 0;
   countdownTime = COUNTDOWN_DURATION;
@@ -35,6 +37,7 @@ export class RaceManager {
     this.difficulty = DIFFICULTY_PROFILES[difficulty];
     this.itemSystem = new ItemSystem(track);
     this.butterflySystem = new ButterflySystem(track);
+    this.obstacleSystem = new ObstacleSystem(track, track.obstacles);
 
     // Pick characters for all 8 slots
     const playerChar = CHARACTERS.find(c => c.id === playerCharId) ?? CHARACTERS[0];
@@ -109,6 +112,9 @@ export class RaceManager {
 
     // ── Collisions ──
     resolveCollisions(this.karts, this.track);
+
+    // ── Obstacles ──
+    this.obstacleSystem.update(dt, this.karts, this.raceTime);
 
     // ── Race progress + positions ──
     for (const kart of this.karts) {

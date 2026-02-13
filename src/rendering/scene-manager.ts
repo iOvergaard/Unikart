@@ -4,10 +4,12 @@ import { Track } from '../track/track';
 import {
   createCharacterModel, createItemBox, createButterflyMesh,
   createRainbowArch, createMeadowTree, createPineTree, createHill, createFlowerPatch,
+  createGateFrame, createHammer,
 } from './voxel-models';
 import { ButterflyInstance } from '../gameplay/butterfly-system';
 import { ItemBox } from '../gameplay/item-system';
-import { CAMERA_DISTANCE, CAMERA_HEIGHT, CAMERA_LERP } from '../config/constants';
+import { Obstacle } from '../gameplay/obstacle-system';
+import { CAMERA_DISTANCE, CAMERA_HEIGHT, CAMERA_LERP, HAMMER_SWING_PERIOD } from '../config/constants';
 
 export class SceneManager {
   readonly renderer: THREE.WebGLRenderer;
@@ -19,6 +21,9 @@ export class SceneManager {
   private butterflyMeshes = new Map<number, THREE.Mesh>(); // id → mesh
   knownButterflyCount = 0; // how many butterflies scene has added
   private raceObjects: THREE.Object3D[] = []; // all race-specific scene objects
+  private obstacleMeshes: THREE.Object3D[] = [];
+  private hammerPivots: THREE.Object3D[] = [];
+  private gateStripes: { stripe: THREE.Object3D; roadWidth: number }[] = [];
 
   // Camera
   private cameraTarget = new THREE.Vector3();
@@ -231,6 +236,61 @@ export class SceneManager {
     }
   }
 
+  /** Create obstacle meshes and position them on the track */
+  setupObstacles(obstacles: Obstacle[]): void {
+    for (const obs of obstacles) {
+      let mesh: THREE.Group;
+
+      if (obs.type === 'gate') {
+        mesh = createGateFrame(obs.roadWidth, obs.boostSlot);
+      } else {
+        mesh = createHammer();
+      }
+
+      // Position at obstacle world coords
+      mesh.position.copy(obs.center);
+
+      // Orient perpendicular to track (so gate spans across, hammer swings across)
+      const angle = Math.atan2(obs.tangent.x, obs.tangent.z);
+      mesh.rotation.y = angle;
+
+      this.scene.add(mesh);
+      this.raceObjects.push(mesh);
+      this.obstacleMeshes.push(mesh);
+
+      if (obs.type === 'hammer') {
+        const pivot = mesh.getObjectByName('armPivot');
+        if (pivot) this.hammerPivots.push(pivot);
+      }
+      if (obs.type === 'gate') {
+        const stripe = mesh.getObjectByName('boostStripe');
+        if (stripe) this.gateStripes.push({ stripe, roadWidth: obs.roadWidth });
+      }
+    }
+  }
+
+  /** Animate hammer arm swings + update gate boost stripe positions */
+  updateObstacles(obstacles: Obstacle[], raceTime: number): void {
+    for (const pivot of this.hammerPivots) {
+      const swingAngle = (raceTime / HAMMER_SWING_PERIOD) * Math.PI * 2;
+      // Rotate around Y axis — the arm swings in the local XZ plane
+      // sin(swingAngle) ranges [-1,1], so max rotation = ±π/2 → head reaches ±armLength/2
+      pivot.rotation.y = Math.sin(swingAngle) * (Math.PI / 2);
+    }
+
+    // Move gate boost stripes to match current boostSlot
+    let gateIdx = 0;
+    for (const obs of obstacles) {
+      if (obs.type === 'gate' && gateIdx < this.gateStripes.length) {
+        const { stripe, roadWidth } = this.gateStripes[gateIdx];
+        const halfWidth = roadWidth / 2;
+        const slotWidth = roadWidth / 3;
+        stripe.position.x = -halfWidth + obs.boostSlot * slotWidth + slotWidth / 2;
+        gateIdx++;
+      }
+    }
+  }
+
   /** Sync item box visibility + animate */
   updateItemBoxes(boxes: ItemBox[], time: number): void {
     for (const box of boxes) {
@@ -311,6 +371,14 @@ export class SceneManager {
       if (kart.drift.isCharging) {
         mesh.rotation.z = kart.drift.driftDirection * 0.15;
       }
+
+      // Turbo visual: scale pulse
+      if (kart.turboTimer > 0) {
+        const pulse = 1 + Math.sin(Date.now() * 0.015) * 0.08;
+        mesh.scale.setScalar(pulse);
+      } else {
+        mesh.scale.setScalar(1);
+      }
     }
 
     // ── Chase camera ──
@@ -346,6 +414,9 @@ export class SceneManager {
     this.itemBoxMeshes.clear();
     this.butterflyMeshes.clear();
     this.knownButterflyCount = 0;
+    this.obstacleMeshes = [];
+    this.hammerPivots = [];
+    this.gateStripes = [];
   }
 
   private createParticleSystems(): void {
@@ -373,7 +444,7 @@ export class SceneManager {
   private updateDriftParticles(kart: Kart): void {
     if (!this.driftParticles) return;
 
-    if (kart.drift.isCharging || kart.drift.isBoosting) {
+    if (kart.drift.isCharging || kart.drift.isBoosting || kart.turboTimer > 0) {
       this.driftParticles.visible = true;
       const pos = this.driftParticles.geometry.attributes.position as THREE.BufferAttribute;
       const col = this.driftParticles.geometry.attributes.color as THREE.BufferAttribute;
@@ -386,8 +457,10 @@ export class SceneManager {
       ];
       const tc = tierColors[Math.min(kart.drift.tier, 2)];
 
-      if (kart.drift.isBoosting) {
-        tc.set(0xff8844); // orange during boost
+      if (kart.turboTimer > 0) {
+        tc.set(0xffee44); // bright yellow during turbo
+      } else if (kart.drift.isBoosting) {
+        tc.set(0xff8844); // orange during drift boost
       }
 
       for (let i = 0; i < 50; i++) {

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { TrackSpline } from './spline';
 import { TrackDef, TrackZone, SceneryZone } from '../config/tracks';
+import { ObstacleDef } from '../config/obstacles';
 import { ROAD_SEGMENTS, ROAD_WIDTH } from '../config/constants';
 
 export class Track {
@@ -33,6 +34,7 @@ export class Track {
   }
 
   get sceneryZones(): SceneryZone[] { return this.def.sceneryZones ?? []; }
+  get obstacles(): ObstacleDef[] { return this.def.obstacles ?? []; }
 
   /** Check if a world position is on the road surface */
   isOnRoad(pos: THREE.Vector3): boolean {
