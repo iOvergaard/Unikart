@@ -27,6 +27,10 @@ export class InputManager {
   itemPressed = false;
   private prevItem = false;
 
+  /** Event-driven pending flags — survive fast tap-and-release between frames */
+  private pendingItem = false;
+  private pendingPause = false;
+
   /** Touch controls */
   readonly isTouchDevice: boolean;
   private touchControls: HTMLElement | null = null;
@@ -36,6 +40,13 @@ export class InputManager {
   constructor() {
     window.addEventListener('keydown', e => {
       this.keys.add(e.code);
+      // Track edge-triggered presses so fast taps aren't lost between frames
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyX') {
+        this.pendingItem = true;
+      }
+      if (e.code === 'Escape' || e.code === 'KeyP') {
+        this.pendingPause = true;
+      }
       e.preventDefault();
     });
     window.addEventListener('keyup', e => {
@@ -82,10 +93,13 @@ export class InputManager {
     if (this.touchState.drift) this.state.drift = true;
     if (this.touchState.item) this.state.item = true;
 
-    // Edge detection (pressed this frame only)
-    this.pausePressed = this.state.pause && !this.prevPause;
+    // Edge detection: use pending flags to catch fast taps between frames
+    this.pausePressed = (this.state.pause && !this.prevPause) || this.pendingPause;
     this.confirmPressed = this.state.confirm && !this.prevConfirm;
-    this.itemPressed = this.state.item && !this.prevItem;
+    this.itemPressed = (this.state.item && !this.prevItem) || this.pendingItem;
+
+    this.pendingItem = false;
+    this.pendingPause = false;
 
     this.prevPause = this.state.pause;
     this.prevConfirm = this.state.confirm;
@@ -191,6 +205,7 @@ export class InputManager {
     const onDown = (e: Event) => {
       e.preventDefault();
       this.touchState[key] = true;
+      if (key === 'item') this.pendingItem = true;
       btn.style.background = `${color}aa`;
     };
     const onUp = (e: Event) => {

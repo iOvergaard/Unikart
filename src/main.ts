@@ -25,8 +25,7 @@ let minimapBounds = { minX: 0, minZ: 0, scale: 1, padding: 15 };
 
 // ── UI Manager ───────────────────────────────────────────
 const ui = new UiManager((action, value) => {
-  audio.resume();
-  audio.playUiClick();
+  audio.resume().then(() => audio.playUiClick());
   switch (action) {
     // Main menu
     case 'play':

@@ -44,11 +44,16 @@ export class AiController {
   update(dt: number, allKarts: Kart[], raceTime: number): AiInput {
     const input: AiInput = { accel: 1, steer: 0, drift: false, useItem: false };
 
-    // Stunned — just accelerate straight
-    if (this.kart.gustTimer > 0) return input;
+    // Stunned — just accelerate straight (difficulty affects recovery)
+    if (this.kart.gustTimer > 0) {
+      input.accel = this.profile.stunRecovery;
+      return input;
+    }
 
     const t = this.track.spline.closestT(this.kart.position);
-    const lookAhead = 0.05; // look 5% of track ahead
+    // Look further ahead at higher speeds for smoother driving
+    const speedRatio = Math.abs(this.kart.speed) / this.kart.maxSpeed;
+    const lookAhead = 0.04 + 0.04 * speedRatio; // 4-8% of track
     const targetT = (t + lookAhead) % 1;
 
     // ── Lane selection (every ~0.5s) ──
@@ -70,15 +75,15 @@ export class AiController {
 
     const fwd = this.kart.forward;
     const cross = fwd.x * toTarget.z - fwd.z * toTarget.x;
-    const dot = fwd.dot(toTarget.normalize());
 
-    // Steer toward target
-    input.steer = Math.max(-1, Math.min(1, -cross * 3));
+    // Steer toward target — sharper response at higher difficulty
+    const steerGain = 2.5 + this.profile.speedMult;
+    input.steer = Math.max(-1, Math.min(1, -cross * steerGain));
 
     // ── Drift decision ──
     const turnSharpness = Math.abs(input.steer);
-    const shouldDrift = turnSharpness > 0.4
-      && this.kart.speed > 15
+    const shouldDrift = turnSharpness > 0.35
+      && this.kart.speed > 12
       && this.pseudoRandom() < this.profile.driftFrequency;
 
     if (shouldDrift && !this.isDrifting && !this.kart.drift.isCharging) {
@@ -88,25 +93,29 @@ export class AiController {
 
     if (this.isDrifting) {
       input.drift = true;
-      // Release drift at appropriate tier
+      // Release drift at target tier using actual tier thresholds
       const chargeTime = raceTime - this.driftStartT;
-      const maxTierTime = [0, 0.4, 0.8, 1.2][this.profile.maxDriftTier];
-      if (chargeTime > maxTierTime || turnSharpness < 0.15) {
+      const tierTimes = [0, 0.38, 0.75, 1.1]; // slightly past actual thresholds [0.35, 0.7, 1.05]
+      const targetTime = tierTimes[this.profile.maxDriftTier];
+      if (chargeTime > targetTime || (turnSharpness < 0.1 && chargeTime > 0.38)) {
         input.drift = false;
         this.isDrifting = false;
       }
     }
 
     // ── Speed management ──
-    // Slow down for tight turns
-    if (turnSharpness > 0.6 && this.kart.speed > this.kart.maxSpeed * 0.7) {
-      input.accel = 0.5;
+    // Only brake for very tight turns at high speed (less aggressive than before)
+    if (turnSharpness > 0.8 && this.kart.speed > this.kart.maxSpeed * 0.85) {
+      input.accel = 0.7;
     }
 
-    // Apply difficulty speed cap
+    // Soft speed cap — coast instead of braking
     if (this.kart.speed > this.kart.maxSpeed * this.profile.speedMult) {
-      input.accel = 0.3;
+      input.accel = 0;
     }
+
+    // Apply difficulty acceleration multiplier
+    input.accel *= this.profile.accelMult;
 
     // ── Item usage ──
     if (this.kart.heldItem) {

@@ -11,16 +11,16 @@ import {
 
 /** Preloaded sample paths (served from public/audio/) */
 const SAMPLES = {
-  click: 'audio/click_003.ogg',
-  pickup: 'audio/pickup2.ogg',
-  turbo: 'audio/upgrade3.ogg',
-  gust: 'audio/laser2.ogg',
-  wobble: 'audio/hurt3.ogg',
-  boost: 'audio/upgrade1.ogg',
-  countdown: 'audio/bong_001.ogg',
-  lap: 'audio/confirmation_002.ogg',
-  bump: 'audio/impactSoft_medium_001.ogg',
-  butterfly: 'audio/coin3.ogg',
+  click: 'audio/click_003.mp3',
+  pickup: 'audio/pickup2.mp3',
+  turbo: 'audio/upgrade3.mp3',
+  gust: 'audio/laser2.mp3',
+  wobble: 'audio/hurt3.mp3',
+  boost: 'audio/upgrade1.mp3',
+  countdown: 'audio/bong_001.mp3',
+  lap: 'audio/confirmation_002.mp3',
+  bump: 'audio/impactSoft_medium_001.mp3',
+  butterfly: 'audio/coin3.mp3',
 } as const;
 
 export class AudioManager {

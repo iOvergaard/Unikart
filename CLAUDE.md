@@ -137,6 +137,19 @@ Butterflies are the main collectible. They spawn as clusters of 4 along the road
 | Use Item | Shift / X | LB / LT |
 | Pause | Escape / P | Start |
 
+### Mobile Touch Controls
+
+Auto-detected via `ontouchstart` / `maxTouchPoints`. Created in `InputManager.createTouchControls()`. Overlay shown during countdown + racing, hidden on results/menus via `setTouchControlsVisible()`.
+
+- **Auto-accelerate**: Kart drives forward automatically on touch devices (no gas button)
+- **Left side**: ◀ ▶ steering buttons
+- **Right side**: 💨 drift (large) + 🎁 item (smaller)
+- Touch state merges with keyboard/gamepad in `update()` — all three input sources are additive
+
+## Hosting
+
+Deployed to GitHub Pages via `.github/workflows/deploy.yml` on every push to `main`. Vite `base: '/Unikart/'` for correct asset paths. Live at https://snebold.dk/Unikart/
+
 ## Audio System
 
 Hybrid: Tone.js oscillators for continuous sounds + Kenney CC0 `.ogg` samples for one-shots. Samples in `public/audio/`.
