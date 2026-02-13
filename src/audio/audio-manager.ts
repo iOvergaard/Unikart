@@ -1,4 +1,3 @@
-import * as Tone from 'tone';
 import { Kart } from '../physics/kart';
 import { RaceManager } from '../gameplay/race-manager';
 import { ItemId } from '../config/items';
@@ -28,25 +27,25 @@ type SampleName = keyof typeof SAMPLES;
 export class AudioManager {
   private started = false;
 
-  // ── Native Web Audio for samples (iOS-compatible) ──
+  // ── Native Web Audio (single AudioContext for everything) ──
   private ctx: AudioContext | null = null;
   private sampleBuffers: Partial<Record<SampleName, AudioBuffer>> = {};
   private sfxGain: GainNode | null = null;
   private masterGainNode: GainNode | null = null;
 
-  // ── Tone.js for oscillators ──
-  private toneStarted = false;
-  private engineOsc!: Tone.Oscillator;
-  private engineOscHigh!: Tone.Oscillator;
-  private engineOscSub!: Tone.Oscillator;
-  private engineFilter!: Tone.Filter;
-  private engineLfo!: Tone.LFO;
-  private engineLfoGain!: Tone.Gain;
-  private engineBus!: Tone.Gain;
+  // ── Engine oscillators (native) ──
+  private engineOsc: OscillatorNode | null = null;
+  private engineOscHigh: OscillatorNode | null = null;
+  private engineOscSub: OscillatorNode | null = null;
+  private engineFilter: BiquadFilterNode | null = null;
+  private engineLfo: OscillatorNode | null = null;
+  private engineLfoGain: GainNode | null = null;
+  private engineBusGain: GainNode | null = null;
   private engineRunning = false;
 
-  private driftOsc!: Tone.Oscillator;
-  private driftGain!: Tone.Gain;
+  // ── Drift oscillator (native) ──
+  private driftOsc: OscillatorNode | null = null;
+  private driftGainNode: GainNode | null = null;
   private driftRunning = false;
 
   // ── Previous-state tracking ──
@@ -62,33 +61,28 @@ export class AudioManager {
   async resume(): Promise<void> {
     if (this.started) return;
 
-    // Create native AudioContext for samples
     this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     if (this.ctx.state === 'suspended') {
       await this.ctx.resume();
     }
 
-    // Gain chain: sfxGain → masterGain → destination
+    // Master gain → destination
     this.masterGainNode = this.ctx.createGain();
     this.masterGainNode.gain.value = 0.8;
     this.masterGainNode.connect(this.ctx.destination);
 
+    // SFX gain → master
     this.sfxGain = this.ctx.createGain();
     this.sfxGain.gain.value = 0.8;
     this.sfxGain.connect(this.masterGainNode);
 
-    // Start loading samples in background
+    // Load samples in background
     this.loadAllSamples();
-
-    // Start Tone.js for oscillators
-    await Tone.start();
-    this.toneStarted = true;
-    this.initToneNodes();
 
     this.started = true;
   }
 
-  /** Load all samples via fetch + decodeAudioData (iOS-safe) */
+  /** Load all samples via fetch + decodeAudioData */
   private async loadAllSamples(): Promise<void> {
     if (!this.ctx) return;
     const entries = Object.entries(SAMPLES) as [SampleName, string][];
@@ -103,34 +97,87 @@ export class AudioManager {
     }));
   }
 
-  /** Create Tone.js oscillator nodes */
-  private initToneNodes(): void {
-    // Engine bus (connects to Tone destination — separate from native ctx)
-    this.engineBus = new Tone.Gain(0.15).toDestination();
+  /** Create engine oscillator nodes (called on race start) */
+  private createEngineNodes(): void {
+    if (!this.ctx || !this.masterGainNode) return;
 
-    // LFO-modulated amplitude for idle "putt-putt"
-    this.engineLfoGain = new Tone.Gain(1).connect(this.engineBus);
-    this.engineLfo = new Tone.LFO(8, 0.3, 1).connect(this.engineLfoGain.gain);
+    // Engine bus gain → master
+    this.engineBusGain = this.ctx.createGain();
+    this.engineBusGain.gain.value = 0.15;
+    this.engineBusGain.connect(this.masterGainNode);
 
-    // Layered oscillators → shared filter → LFO gain → bus
-    this.engineFilter = new Tone.Filter(300, 'lowpass', -24).connect(this.engineLfoGain);
-    this.engineOsc = new Tone.Oscillator(ENGINE_BASE_FREQ, 'sawtooth').connect(this.engineFilter);
-    this.engineOscHigh = new Tone.Oscillator(ENGINE_BASE_FREQ * 2, 'square').connect(this.engineFilter);
-    this.engineOscHigh.volume.value = -14;
-    this.engineOscSub = new Tone.Oscillator(ENGINE_BASE_FREQ * 0.5, 'triangle').connect(this.engineFilter);
-    this.engineOscSub.volume.value = -8;
+    // LFO gain node (amplitude modulation for idle chug)
+    this.engineLfoGain = this.ctx.createGain();
+    this.engineLfoGain.gain.value = 1;
+    this.engineLfoGain.connect(this.engineBusGain);
 
-    // Drift charge (square wave, starts silent)
-    this.driftGain = new Tone.Gain(0).toDestination();
-    this.driftOsc = new Tone.Oscillator(DRIFT_CHARGE_FREQS[0], 'square').connect(this.driftGain);
+    // LFO oscillator → controls engineLfoGain.gain
+    this.engineLfo = this.ctx.createOscillator();
+    this.engineLfo.frequency.value = 8;
+    const lfoScaler = this.ctx.createGain();
+    lfoScaler.gain.value = 0.35; // LFO depth
+    this.engineLfo.connect(lfoScaler);
+    lfoScaler.connect(this.engineLfoGain.gain);
+
+    // Low-pass filter → LFO gain
+    this.engineFilter = this.ctx.createBiquadFilter();
+    this.engineFilter.type = 'lowpass';
+    this.engineFilter.frequency.value = 300;
+    this.engineFilter.Q.value = 0.5;
+    this.engineFilter.connect(this.engineLfoGain);
+
+    // Main sawtooth oscillator
+    this.engineOsc = this.ctx.createOscillator();
+    this.engineOsc.type = 'sawtooth';
+    this.engineOsc.frequency.value = ENGINE_BASE_FREQ;
+    this.engineOsc.connect(this.engineFilter);
+
+    // High harmonic (square, quieter)
+    this.engineOscHigh = this.ctx.createOscillator();
+    this.engineOscHigh.type = 'square';
+    this.engineOscHigh.frequency.value = ENGINE_BASE_FREQ * 2;
+    const highGain = this.ctx.createGain();
+    highGain.gain.value = 0.2; // ~-14dB
+    this.engineOscHigh.connect(highGain);
+    highGain.connect(this.engineFilter);
+
+    // Sub harmonic (triangle, moderate)
+    this.engineOscSub = this.ctx.createOscillator();
+    this.engineOscSub.type = 'triangle';
+    this.engineOscSub.frequency.value = ENGINE_BASE_FREQ * 0.5;
+    const subGain = this.ctx.createGain();
+    subGain.gain.value = 0.4; // ~-8dB
+    this.engineOscSub.connect(subGain);
+    subGain.connect(this.engineFilter);
+
+    // Start all
+    this.engineOsc.start();
+    this.engineOscHigh.start();
+    this.engineOscSub.start();
+    this.engineLfo.start();
+  }
+
+  /** Destroy engine oscillator nodes (called on race end) */
+  private destroyEngineNodes(): void {
+    this.engineOsc?.stop();
+    this.engineOscHigh?.stop();
+    this.engineOscSub?.stop();
+    this.engineLfo?.stop();
+    this.engineOsc = null;
+    this.engineOscHigh = null;
+    this.engineOscSub = null;
+    this.engineLfo = null;
+    this.engineLfoGain = null;
+    this.engineFilter = null;
+    this.engineBusGain = null;
   }
 
   /** Called each frame during a race */
   update(_dt: number, humanKart: Kart, race: RaceManager): void {
     if (!this.started) return;
 
-    // ── Engine pitch + volume + LFO ──
-    if (this.engineRunning) {
+    // ── Engine pitch + volume ──
+    if (this.engineRunning && this.engineOsc && this.engineOscHigh && this.engineOscSub && this.engineFilter && this.engineLfo && this.engineBusGain) {
       const speedRatio = Math.min(Math.abs(humanKart.speed) / (humanKart.baseMaxSpeed || BASE_MAX_SPEED), 1);
       const curve = speedRatio * speedRatio * 0.4 + speedRatio * 0.6;
       const freq = ENGINE_BASE_FREQ + (ENGINE_MAX_FREQ - ENGINE_BASE_FREQ) * curve;
@@ -139,12 +186,10 @@ export class AudioManager {
       this.engineOscSub.frequency.value = freq * 0.5;
       this.engineFilter.frequency.value = 180 + 900 * curve;
       this.engineLfo.frequency.value = 6 + 14 * speedRatio;
-      this.engineLfo.min = 0.3 + 0.6 * speedRatio;
-      this.engineLfo.max = 1;
       const vol = speedRatio < 0.6
         ? 0.1 + 0.9 * (speedRatio / 0.6)
         : 1.0 - 0.3 * ((speedRatio - 0.6) / 0.4);
-      this.engineBus.gain.value = 0.15 * vol;
+      this.engineBusGain.gain.value = 0.15 * vol;
     }
 
     // ── Drift charge start/stop ──
@@ -158,7 +203,7 @@ export class AudioManager {
 
     // ── Drift tier change ──
     const tier = humanKart.drift.tier;
-    if (isCharging && tier !== this.prevDriftTier && tier > 0) {
+    if (isCharging && tier !== this.prevDriftTier && tier > 0 && this.driftOsc) {
       this.driftOsc.frequency.value = DRIFT_CHARGE_FREQS[Math.min(tier - 1, 2)];
     }
     this.prevDriftTier = tier;
@@ -214,49 +259,38 @@ export class AudioManager {
     }
   }
 
-  /** Play UI click sound */
   playUiClick(): void {
     if (!this.started) return;
     this.playSample('click');
   }
 
-  /** Play bump/collision sound */
   playBump(): void {
     if (!this.started) return;
     this.playSample('bump');
   }
 
-  /** Set SFX volume (0..1) */
   setSfxVolume(v: number): void {
     if (this.sfxGain) this.sfxGain.gain.value = v;
   }
 
-  /** Set music volume (0..1) — reserved for future music loop */
   setMusicVolume(_v: number): void {
     // No music loop yet
   }
 
-  /** Mute all audio (e.g. when paused) */
   mute(): void {
     if (this.masterGainNode) this.masterGainNode.gain.value = 0;
-    if (this.toneStarted) Tone.getDestination().volume.value = -Infinity;
   }
 
-  /** Unmute all audio (e.g. when resuming) */
   unmute(): void {
     if (this.masterGainNode) this.masterGainNode.gain.value = 0.8;
-    if (this.toneStarted) Tone.getDestination().volume.value = 0;
   }
 
   /** Start continuous sounds at race begin */
   startRace(): void {
     if (!this.started) return;
     this.resetPrevState();
-    if (!this.engineRunning && this.toneStarted) {
-      this.engineOsc.start();
-      this.engineOscHigh.start();
-      this.engineOscSub.start();
-      this.engineLfo.start();
+    if (!this.engineRunning) {
+      this.createEngineNodes();
       this.engineRunning = true;
     }
   }
@@ -265,10 +299,7 @@ export class AudioManager {
   stopRace(): void {
     if (!this.started) return;
     if (this.engineRunning) {
-      this.engineOsc.stop();
-      this.engineOscHigh.stop();
-      this.engineOscSub.stop();
-      this.engineLfo.stop();
+      this.destroyEngineNodes();
       this.engineRunning = false;
     }
     this.stopDriftCharge();
@@ -277,7 +308,6 @@ export class AudioManager {
 
   // ── Internal helpers ──
 
-  /** Play a sample using native Web Audio API */
   private playSample(name: SampleName, playbackRate = 1): void {
     if (!this.ctx || !this.sfxGain) return;
     const buffer = this.sampleBuffers[name];
@@ -291,17 +321,26 @@ export class AudioManager {
   }
 
   private startDriftCharge(): void {
-    if (this.driftRunning || !this.toneStarted) return;
-    this.driftGain.gain.value = 0.15;
+    if (this.driftRunning || !this.ctx || !this.masterGainNode) return;
+
+    this.driftGainNode = this.ctx.createGain();
+    this.driftGainNode.gain.value = 0.15;
+    this.driftGainNode.connect(this.masterGainNode);
+
+    this.driftOsc = this.ctx.createOscillator();
+    this.driftOsc.type = 'square';
     this.driftOsc.frequency.value = DRIFT_CHARGE_FREQS[0];
+    this.driftOsc.connect(this.driftGainNode);
     this.driftOsc.start();
+
     this.driftRunning = true;
   }
 
   private stopDriftCharge(): void {
     if (!this.driftRunning) return;
-    this.driftGain.gain.value = 0;
-    this.driftOsc.stop();
+    this.driftOsc?.stop();
+    this.driftOsc = null;
+    this.driftGainNode = null;
     this.driftRunning = false;
   }
 
