@@ -111,7 +111,7 @@ export class RaceManager {
     }
 
     // ── Collisions ──
-    resolveCollisions(this.karts, this.track);
+    resolveCollisions(this.karts, this.track, this.raceTime);
 
     // ── Obstacles ──
     this.obstacleSystem.update(dt, this.karts, this.raceTime);

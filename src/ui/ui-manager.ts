@@ -156,6 +156,13 @@ export class UiManager {
 
         <div style="margin-bottom:20px">
           <label style="color:#fff;font-family:cursive;display:flex;align-items:center;gap:10px;cursor:pointer">
+            <input type="checkbox" ${state.autoAccelerate ? 'checked' : ''} data-action="toggle-auto-accel" style="width:20px;height:20px">
+            🚗 Auto-Accelerate
+          </label>
+        </div>
+
+        <div style="margin-bottom:20px">
+          <label style="color:#fff;font-family:cursive;display:flex;align-items:center;gap:10px;cursor:pointer">
             <input type="checkbox" ${s.mirrorMode ? 'checked' : ''} data-action="toggle-mirror" style="width:20px;height:20px">
             🪞 Mirror Mode
           </label>

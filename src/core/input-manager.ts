@@ -35,7 +35,9 @@ export class InputManager {
   readonly isTouchDevice: boolean;
   private touchControls: HTMLElement | null = null;
   private touchState = { left: false, right: false, drift: false, item: false };
-  private autoAccelerate = false;
+
+  /** Auto-accelerate — kart drives forward automatically */
+  autoAccelerate = false;
 
   constructor() {
     window.addEventListener('keydown', e => {
@@ -65,7 +67,6 @@ export class InputManager {
   setTouchControlsVisible(visible: boolean): void {
     if (!this.touchControls) return;
     this.touchControls.style.display = visible ? 'flex' : 'none';
-    this.autoAccelerate = visible;
     if (!visible) {
       this.touchState.left = false;
       this.touchState.right = false;

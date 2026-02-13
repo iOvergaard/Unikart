@@ -30,6 +30,8 @@ export class GameState {
     mirrorMode: false,
     allowClones: false,
   };
+  /** Auto-accelerate (kart drives forward automatically) — ON by default */
+  autoAccelerate = true;
   /** Volume settings 0..1 */
   musicVolume = 0.7;
   sfxVolume = 0.8;

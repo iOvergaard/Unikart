@@ -5,8 +5,10 @@ import { WALL_BOUNCE_FACTOR, WALL_PUSH_FORCE, KART_BOUNCE_FACTOR } from '../conf
 
 const _tmpVec = new THREE.Vector3();
 
+const GRACE_PERIOD = 2; // seconds after race start with no kart-kart collisions
+
 /** Handle all collisions for a frame */
-export function resolveCollisions(karts: Kart[], track: Track): void {
+export function resolveCollisions(karts: Kart[], track: Track, raceTime = Infinity): void {
   // ── Kart vs Track barriers ──
   for (const kart of karts) {
     const push = track.getBarrierPush(kart.position);
@@ -22,7 +24,9 @@ export function resolveCollisions(karts: Kart[], track: Track): void {
     }
   }
 
-  // ── Kart vs Kart ──
+  // ── Kart vs Kart (skip during grace period) ──
+  if (raceTime < GRACE_PERIOD) return;
+
   for (let i = 0; i < karts.length; i++) {
     for (let j = i + 1; j < karts.length; j++) {
       const a = karts[i];

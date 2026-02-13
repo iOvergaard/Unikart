@@ -67,6 +67,9 @@ const ui = new UiManager((action, value) => {
     case 'toggle-clones':
       state.raceSettings.allowClones = value;
       break;
+    case 'toggle-auto-accel':
+      state.autoAccelerate = value;
+      break;
     case 'back-to-characters':
       state.transition('character-select');
       break;
@@ -165,6 +168,7 @@ function gameLoop(time: number): void {
   const dt = Math.min((time - lastTime) / 1000, 0.1); // cap delta
   lastTime = time;
 
+  input.autoAccelerate = state.autoAccelerate;
   input.update();
 
   // Handle pause toggle
