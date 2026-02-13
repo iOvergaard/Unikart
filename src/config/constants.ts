@@ -26,7 +26,7 @@ export const DRIFT_BOOST_DURATIONS = [0, 0.7, 1.1, 1.5]; // tier 0/1/2/3
 export const DRIFT_BOOST_MULTIPLIER = 1.35;
 export const DRIFT_ZONE_CHARGE_MULTIPLIER = 1.5;
 export const DRIFT_STEERING_MULTIPLIER = 1.2;
-export const DRIFT_FRICTION_MULTIPLIER = 0.6;
+export const DRIFT_FRICTION_MULTIPLIER = 0.98;
 export const DRIFT_COOLDOWN = 0.15;
 
 // ── Items ────────────────────────────────────────────────

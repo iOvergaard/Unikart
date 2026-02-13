@@ -49,12 +49,13 @@ export class RaceManager {
       this.karts.push(new Kart(i, allChars[i], i === 0));
     }
 
-    // Place on starting grid
-    this.placeOnGrid();
+    // Place on starting grid — human position depends on difficulty
+    const humanGridSlot = difficulty === 'chill' ? 0 : difficulty === 'standard' ? 4 : 7;
+    this.placeOnGrid(humanGridSlot);
 
     // Create AI controllers for CPU karts
     for (let i = 1; i < TOTAL_RACERS; i++) {
-      this.aiControllers.push(new AiController(this.karts[i], track, this.difficulty));
+      this.aiControllers.push(new AiController(this.karts[i], track, this.difficulty, this.itemSystem, this.butterflySystem));
     }
 
     // Init positions
@@ -169,23 +170,33 @@ export class RaceManager {
     }
   }
 
-  /** Place 8 karts on a 2-wide starting grid */
-  private placeOnGrid(): void {
+  /** Place 8 karts on a 2-wide starting grid. humanGridSlot controls where the player starts (0=P1, 7=P8). */
+  private placeOnGrid(humanGridSlot = 0): void {
     const startT = 0.05; // well past start/finish line
     const center = this.track.spline.getPoint(startT);
     const tangent = this.track.spline.getTangent(startT);
     const right = this.track.spline.getRight(startT);
     const heading = Math.atan2(tangent.x, tangent.z);
 
+    // Map kart indices to grid slots: human at humanGridSlot, AI fills the rest
+    const slotForKart: number[] = new Array(this.karts.length);
+    slotForKart[0] = humanGridSlot;
+    let nextSlot = 0;
+    for (let i = 1; i < this.karts.length; i++) {
+      if (nextSlot === humanGridSlot) nextSlot++;
+      slotForKart[i] = nextSlot;
+      nextSlot++;
+    }
+
     for (let i = 0; i < this.karts.length; i++) {
-      const row = Math.floor(i / 2);
-      const col = (i % 2) === 0 ? -1 : 1;
+      const slot = slotForKart[i];
+      const row = Math.floor(slot / 2);
+      const col = (slot % 2) === 0 ? -1 : 1;
 
       const pos = center.clone()
         .add(tangent.clone().multiplyScalar(-row * 5))
         .add(right.clone().multiplyScalar(col * 3));
 
-      // Compute each kart's actual spline t so positions don't wrap around start line
       const actualT = this.track.spline.closestT(pos);
       this.karts[i].placeOnGrid(pos, heading, actualT);
     }
