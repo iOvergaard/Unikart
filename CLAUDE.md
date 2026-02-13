@@ -41,9 +41,9 @@ src/ui/                        ← DOM-based menus + HUD (ui-manager.ts)
 
 **Track** (`track/track.ts`): Built from a `TrackDef` (control points + zones). Creates a `TrackSpline` (closed Catmull-Rom), generates procedural road mesh, barriers, ground. Provides `isOnRoad()`, `isInZone()`, `getBarrierPush()` queries.
 
-**Drift-Boost** (`physics/drift-boost.ts`): State machine: `idle → charging → boosting → cooldown`. Tier thresholds at 0.35s/0.7s/1.05s of charge time. Boost durations: Tier 1 = 0.7s, Tier 2 = 1.1s, Tier 3 = 1.5s. All at 1.35× speed multiplier. Drift zones charge 1.5× faster.
+**Drift-Boost** (`physics/drift-boost.ts`): State machine: `idle → charging → boosting → cooldown`. Tier thresholds at 0.35s/0.7s/1.05s of charge time. Boost durations: Tier 1 = 0.7s, Tier 2 = 1.1s, Tier 3 = 1.5s. All at 1.35× speed multiplier. Drift zones charge 1.5× faster. Drift friction multiplier is 0.98 (nearly neutral — drifting maintains speed, boost is the reward).
 
-**AI** (`ai/ai-controller.ts`): Spline-following with lane offsets. Speed-adaptive look-ahead (4-8% of track). Decides steering, drift timing, item usage every ~0.3-0.7s. Personality from character's `aiTendency` (aggressive, drift-happy, defensive, item-focused, smooth, balanced, pusher). Difficulty from `ai/difficulty.ts` profiles — `accelMult`, `speedMult`, `stunRecovery` all actively applied. Drift timing aligned with actual tier thresholds.
+**AI** (`ai/ai-controller.ts`): Spline-following with lane offsets. Speed-adaptive look-ahead (4-8% of track). Decides steering, drift timing, item usage every ~0.3-0.7s. Personality from character's `aiTendency` (aggressive, drift-happy, defensive, item-focused, smooth, balanced, pusher). Difficulty from `ai/difficulty.ts` profiles — `accelMult`, `speedMult`, `stunRecovery` all actively applied. Drift timing aligned with actual tier thresholds. **Overtake awareness**: finds nearest kart ahead (dot-product check, no expensive `closestT`) and picks the opposite lane to pass, gated by `profile.overtakeChance`. **Side awareness**: nudges lane offset away from karts beside (within 8 units, not ahead/behind). **Collectible seeking**: biases toward nearby item boxes (when no item held) and butterflies; `item-focused` tendency seeks hardest (0.8 strength vs 0.3 base), scaled by difficulty. **Off-road avoidance**: if kart is off-road, pulls lane blend toward center (×0.3) and reduces accel (×0.6); chosen lane offset is tested against `track.isOnRoad()` and clamped if off-road. **Speed management**: no turn-braking; soft speed cap via coasting, but drift-boosts and turbos bypass the cap. **Start spread**: AI karts initialise with lane offsets matching their grid column (±3 units) and delay first lane decision by 2-3s to prevent pile-ups.
 
 **Collision** (`physics/collision.ts`): Kart↔barrier (gentle push-back, never stop dead) and kart↔kart (weight-based separation, gentle bumps). Called once per physics frame. 5-second grace period at race start — kart-kart collisions disabled to prevent grid pile-ups.
 
@@ -124,7 +124,7 @@ Butterflies are the main collectible. They spawn as clusters of 4 along the road
 
 ## Track: Rainbow Meadow
 
-12 control points forming a closed Catmull-Rom spline. ~1.2km loop. 4 sections: flower straightaway → right curve → back straight → left sweeper (drift zone) → castle hill → wide finish approach. Road width 18-22 units. Rainbow-coloured barriers. Drift zone from t=0.5 to t=0.7. Item zones at t≈0.08, 0.38, 0.83. Chequered start/finish line at t=0 with pink banner arch. Starting grid at t=0.02 with 8 numbered boxes (2-wide, 4 rows).
+12 control points forming a closed Catmull-Rom spline. ~1.2km loop. 4 sections: flower straightaway → right curve → back straight → left sweeper (drift zone) → castle hill → wide finish approach. Road width 18-22 units. Rainbow-coloured barriers. Drift zone from t=0.5 to t=0.7. Item zones at t≈0.08, 0.38, 0.83. Chequered start/finish line at t=0 with pink banner arch. Starting grid at t=0.05 with 8 slots (2-wide, 4 rows). **Grid position is difficulty-dependent**: Chill = P1 (front), Standard = P5 (middle), Mean = P8 (last). Human gets their slot; AI fills the rest in order.
 
 ## Controls
 
@@ -208,8 +208,8 @@ Detection uses polling: `AudioManager.update()` compares current kart state agai
 | **7 more tracks** | Stubs exist | `config/tracks.ts` | Track system is generic — add `controlPoints` + `zones` per track |
 | **5 more items** | 3 of 8 built | `config/items.ts` + `gameplay/item-system.ts` | Need 5 new effects. Max stun ≤1.2s, max steer-lock ≤0.6s |
 | **Lap splits** | Data tracked, not displayed | `ui/ui-manager.ts` | `Kart.lapTimes[]` already exists, just needs HUD display |
-| **AI multi-lane racing** | Basic spline-follow only | `ai/ai-controller.ts` | Needs variation splines, lane offsets for clean overtakes |
-| **AI hazard avoidance** | Not implemented | `ai/ai-controller.ts` | Dodge obstacles, avoid off-road |
+| **AI multi-lane racing** | Done | `ai/ai-controller.ts` | Overtake awareness, side awareness, collectible seeking |
+| **AI hazard avoidance** | Done | `ai/ai-controller.ts` | Off-road detection + correction, lane offset clamping |
 | **Butterfly collection sparkle** | Butterflies just disappear | `rendering/scene-manager.ts` | Brief particle burst on collect |
 
 ## Design Principles
@@ -238,9 +238,9 @@ Detection uses polling: `AudioManager.update()` compares current kart state agai
 | `src/track/track.ts` | 180 | Track class (mesh gen, queries) |
 | `src/rendering/scene-manager.ts` | 469 | Three.js scene, camera, particles, butterflies, finish line, grid |
 | `src/rendering/voxel-models.ts` | 230 | Unicorn + butterfly + item box model builder |
-| `src/ai/ai-controller.ts` | 140 | AI driving logic |
+| `src/ai/ai-controller.ts` | 327 | AI driving logic (overtakes, collectible seeking, off-road avoidance) |
 | `src/ai/difficulty.ts` | 42 | Chill/Standard/Mean profiles |
-| `src/gameplay/race-manager.ts` | 206 | Race orchestration |
+| `src/gameplay/race-manager.ts` | 224 | Race orchestration (difficulty-dependent grid position) |
 | `src/gameplay/butterfly-system.ts` | 101 | Butterfly spawning, collection, scoring |
 | `src/gameplay/item-system.ts` | 141 | Item box pickup/respawn, usage/effects, toast |
 | `src/audio/audio-manager.ts` | 357 | Native Web Audio oscillators + sample players, state-polling |
