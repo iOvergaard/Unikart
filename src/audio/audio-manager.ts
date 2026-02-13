@@ -27,22 +27,22 @@ export class AudioManager {
   private started = false;
 
   // ── Gain buses ──
-  private masterGain: Tone.Gain;
-  private sfxBus: Tone.Gain;
-  private engineBus: Tone.Gain;
+  private masterGain!: Tone.Gain;
+  private sfxBus!: Tone.Gain;
+  private engineBus!: Tone.Gain;
 
   // ── Engine (layered oscillators for richer sound) ──
-  private engineOsc: Tone.Oscillator;       // fundamental sawtooth
-  private engineOscHigh: Tone.Oscillator;   // octave-up square for "bite"
-  private engineOscSub: Tone.Oscillator;    // sub-octave triangle for body
-  private engineFilter: Tone.Filter;
-  private engineLfo: Tone.LFO;             // amplitude modulation for "putt-putt" idle
-  private engineLfoGain: Tone.Gain;         // LFO target
+  private engineOsc!: Tone.Oscillator;
+  private engineOscHigh!: Tone.Oscillator;
+  private engineOscSub!: Tone.Oscillator;
+  private engineFilter!: Tone.Filter;
+  private engineLfo!: Tone.LFO;
+  private engineLfoGain!: Tone.Gain;
   private engineRunning = false;
 
-  // ── Drift charge (oscillator — needs continuous pitch stepping) ──
-  private driftOsc: Tone.Oscillator;
-  private driftGain: Tone.Gain;
+  // ── Drift charge (square wave, starts silent) ──
+  private driftOsc!: Tone.Oscillator;
+  private driftGain!: Tone.Gain;
   private driftRunning = false;
 
   // ── Sample players ──
@@ -57,7 +57,16 @@ export class AudioManager {
   private prevLap = 0;
   private prevButterflies = 0;
 
-  constructor() {
+  /** Call on first user interaction to unlock Web Audio */
+  async resume(): Promise<void> {
+    if (this.started) return;
+    await Tone.start();
+    this.initNodes();
+    this.started = true;
+  }
+
+  /** Create all Tone.js nodes — called only after user gesture */
+  private initNodes(): void {
     // Master → destination
     this.masterGain = new Tone.Gain(0.8).toDestination();
 
@@ -73,9 +82,9 @@ export class AudioManager {
     this.engineFilter = new Tone.Filter(300, 'lowpass', -24).connect(this.engineLfoGain);
     this.engineOsc = new Tone.Oscillator(ENGINE_BASE_FREQ, 'sawtooth').connect(this.engineFilter);
     this.engineOscHigh = new Tone.Oscillator(ENGINE_BASE_FREQ * 2, 'square').connect(this.engineFilter);
-    this.engineOscHigh.volume.value = -14; // quieter harmonic layer
+    this.engineOscHigh.volume.value = -14;
     this.engineOscSub = new Tone.Oscillator(ENGINE_BASE_FREQ * 0.5, 'triangle').connect(this.engineFilter);
-    this.engineOscSub.volume.value = -8;  // warm sub-octave body
+    this.engineOscSub.volume.value = -8;
 
     // ── Drift charge (square wave, starts silent) ──
     this.driftGain = new Tone.Gain(0).connect(this.sfxBus);
@@ -85,13 +94,6 @@ export class AudioManager {
     for (const [key, url] of Object.entries(SAMPLES)) {
       this.players[key as keyof typeof SAMPLES] = new Tone.Player(url).connect(this.sfxBus);
     }
-  }
-
-  /** Call on first user interaction to unlock Web Audio */
-  async resume(): Promise<void> {
-    if (this.started) return;
-    await Tone.start();
-    this.started = true;
   }
 
   /** Called each frame during a race */
@@ -208,6 +210,7 @@ export class AudioManager {
 
   /** Set SFX volume (0..1) */
   setSfxVolume(v: number): void {
+    if (!this.started) return;
     this.sfxBus.gain.value = v;
   }
 
@@ -231,6 +234,7 @@ export class AudioManager {
 
   /** Stop all continuous sounds at race end */
   stopRace(): void {
+    if (!this.started) return;
     if (this.engineRunning) {
       this.engineOsc.stop();
       this.engineOscHigh.stop();

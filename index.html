@@ -8,11 +8,11 @@
   <meta name="theme-color" content="#FF69B4" />
 
   <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-  <link rel="manifest" href="/site.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="manifest" href="site.webmanifest" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
@@ -39,6 +39,16 @@
     }
     .card.selected { border-color: #ff69b4; background: #fff0f5; }
     .card:hover { transform: scale(1.05); }
+
+    /* Mobile portrait */
+    @media (max-width: 600px) {
+      .menu-btn { font-size: 1.3em; padding: 12px 30px; }
+      .card { padding: 12px 8px; }
+      .card-grid { grid-template-columns: repeat(2, 1fr) !important; max-width: 100% !important; gap: 8px !important; }
+      .diff-btn { font-size: 1em !important; padding: 10px 16px !important; }
+      .results-table { font-size: 0.8em; }
+      .results-table td, .results-table th { padding: 4px 6px !important; }
+    }
   </style>
 </head>
 <body>

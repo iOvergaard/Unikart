@@ -84,9 +84,9 @@ export class UiManager {
     `).join('');
 
     this.overlay.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;padding:30px;height:100%;background:rgba(0,0,0,0.7)">
+      <div style="display:flex;flex-direction:column;align-items:center;padding:20px;height:100%;background:rgba(0,0,0,0.7);overflow-y:auto">
         <h2 style="color:#fff;font-family:cursive;font-size:2em;margin-bottom:20px">Choose a Track!</h2>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:15px;max-width:900px">${trackCards}</div>
+        <div class="card-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:15px;max-width:900px">${trackCards}</div>
         <div style="margin-top:30px">
           <button class="menu-btn" data-action="next-to-character">Next →</button>
           <button class="menu-btn" data-action="back-to-menu" style="background:#eee;color:#999">← Back</button>
@@ -125,9 +125,9 @@ export class UiManager {
     }).join('');
 
     this.overlay.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;padding:30px;height:100%;background:rgba(0,0,0,0.7)">
+      <div style="display:flex;flex-direction:column;align-items:center;padding:20px;height:100%;background:rgba(0,0,0,0.7);overflow-y:auto">
         <h2 style="color:#fff;font-family:cursive;font-size:2em;margin-bottom:20px">Choose Your Racer!</h2>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:800px">${charCards}</div>
+        <div class="card-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:800px">${charCards}</div>
         <div style="margin-top:30px">
           <button class="menu-btn" data-action="next-to-settings">Next →</button>
           <button class="menu-btn" data-action="back-to-tracks" style="background:#eee;color:#999">← Back</button>
@@ -394,7 +394,7 @@ export class UiManager {
         <h2 style="color:#fff;font-family:cursive;font-size:2.5em;margin-bottom:20px;text-shadow:2px 2px 0 #c060a0">
           🏆 Race Complete! 🏆
         </h2>
-        <table style="font-family:cursive;border-collapse:collapse;margin-bottom:30px">
+        <table class="results-table" style="font-family:cursive;border-collapse:collapse;margin-bottom:30px">
           <tr style="color:#fff;opacity:0.7;font-size:0.9em">
             <th style="padding:4px 15px">#</th><th style="padding:4px 10px">Racer</th>
             <th style="padding:4px 10px">Time</th><th style="padding:4px 10px">🦋</th>
