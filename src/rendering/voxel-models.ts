@@ -177,15 +177,54 @@ export function createButterflyMesh(): THREE.Mesh {
   return mesh;
 }
 
-/** Create item pickup box mesh */
-export function createItemBox(): THREE.Mesh {
-  const geo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-  const mat = new THREE.MeshLambertMaterial({
-    color: 0xffdd44,
+/** Create item pickup box mesh — rainbow gift box with "?" */
+export function createItemBox(): THREE.Group {
+  const group = new THREE.Group();
+
+  // Main box — larger and opaque
+  const boxGeo = new THREE.BoxGeometry(2.5, 2.5, 2.5);
+  const boxMat = new THREE.MeshLambertMaterial({
+    color: 0xff66aa,
     transparent: true,
-    opacity: 0.7,
+    opacity: 0.85,
   });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.y = 1;
-  return mesh;
+  const box = new THREE.Mesh(boxGeo, boxMat);
+  group.add(box);
+
+  // Rainbow accent edges (4 vertical strips)
+  const stripColors = [0xff4444, 0x44ff44, 0x4488ff, 0xffdd44];
+  for (let i = 0; i < 4; i++) {
+    const stripGeo = new THREE.BoxGeometry(0.3, 2.6, 0.3);
+    const stripMat = new THREE.MeshLambertMaterial({ color: stripColors[i] });
+    const strip = new THREE.Mesh(stripGeo, stripMat);
+    const angle = (i / 4) * Math.PI * 2;
+    strip.position.set(Math.cos(angle) * 1.2, 0, Math.sin(angle) * 1.2);
+    group.add(strip);
+  }
+
+  // "?" label — flat plane with canvas texture
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 52px cursive';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('?', 32, 32);
+  const texture = new THREE.CanvasTexture(canvas);
+  const labelGeo = new THREE.PlaneGeometry(1.8, 1.8);
+  const labelMat = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+  // Front face
+  const labelFront = new THREE.Mesh(labelGeo, labelMat);
+  labelFront.position.z = 1.26;
+  group.add(labelFront);
+  // Back face
+  const labelBack = new THREE.Mesh(labelGeo, labelMat);
+  labelBack.position.z = -1.26;
+  labelBack.rotation.y = Math.PI;
+  group.add(labelBack);
+
+  group.position.y = 1.8;
+  return group;
 }

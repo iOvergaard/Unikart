@@ -33,7 +33,7 @@ export class RaceManager {
   constructor(track: Track, playerCharId: string, difficulty: Difficulty, allowClones: boolean) {
     this.track = track;
     this.difficulty = DIFFICULTY_PROFILES[difficulty];
-    this.itemSystem = new ItemSystem();
+    this.itemSystem = new ItemSystem(track);
     this.butterflySystem = new ButterflySystem(track);
 
     // Pick characters for all 8 slots
@@ -119,7 +119,7 @@ export class RaceManager {
     this.updatePositions();
 
     // ── Item pickups ──
-    this.itemSystem.updatePickups(this.karts, this.track, this.positions);
+    this.itemSystem.updatePickups(dt, this.karts, this.positions);
 
     // ── Butterfly collection ──
     this.butterflySystem.update(dt, this.karts, this.track);
@@ -142,8 +142,8 @@ export class RaceManager {
     }
   }
 
-  /** Human uses their held item */
-  usePlayerItem(): boolean {
+  /** Human uses their held item. Returns toast message or null. */
+  usePlayerItem(): string | null {
     return this.itemSystem.useItem(this.humanKart, this.karts, this.positions);
   }
 

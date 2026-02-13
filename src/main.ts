@@ -108,6 +108,7 @@ function startRace(): void {
 
   scene.setupTrack(track);
   scene.setupKarts(race.karts);
+  scene.setupItemBoxes(race.itemSystem.boxes);
   scene.setupButterflies(race.butterflySystem.butterflies);
 
   // Pre-compute minimap points
@@ -143,6 +144,7 @@ events.on('race-finished', () => {
 // ── Game loop ────────────────────────────────────────────
 let lastTime = 0;
 let accumulator = 0;
+let pendingToast: string | null = null;
 
 function gameLoop(time: number): void {
   requestAnimationFrame(gameLoop);
@@ -167,7 +169,8 @@ function gameLoop(time: number): void {
 
       // Human item usage
       if (input.itemPressed && state.screen === 'racing') {
-        race.usePlayerItem();
+        const result = race.usePlayerItem();
+        if (result) pendingToast = result;
       }
 
       accumulator -= FIXED_DT;
@@ -182,6 +185,7 @@ function gameLoop(time: number): void {
     const collected = race.butterflySystem.drainCollected();
     if (collected.length > 0) scene.removeButterflies(collected);
     scene.updateButterflies(race.raceTime);
+    scene.updateItemBoxes(race.itemSystem.boxes, race.raceTime);
 
     scene.updateFrame(race.karts, race.humanKart, dt);
     scene.render();
@@ -193,6 +197,7 @@ function gameLoop(time: number): void {
   if (state.screen === 'countdown' && race) {
     if (race.isCountingDown) {
       ui.show('countdown', state, { ...hudData, countdown: race.countdownTime });
+      return; // don't call ui.show again with missing countdown data
     } else {
       state.transition('racing');
     }
@@ -233,6 +238,10 @@ function buildHudData(): RaceHudData {
     score: computeScore(i, k.butterflies),
   }));
 
+  // Grab and clear pending toast
+  const toast = pendingToast;
+  pendingToast = null;
+
   return {
     position: race.positions[hk.id],
     lap: hk.lap,
@@ -241,6 +250,7 @@ function buildHudData(): RaceHudData {
     butterflies: hk.butterflies,
     driftTier: hk.drift.isCharging ? hk.drift.tier : 0,
     isBoosting: hk.drift.isBoosting,
+    toast: toast ?? undefined,
     minimapPoints,
     minimapDots: dots,
     standings,

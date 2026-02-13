@@ -240,6 +240,11 @@ export class UiManager {
              font-size:3em;color:#ffd700;text-shadow:3px 3px 0 #000;opacity:0;
              font-weight:bold;transition:opacity 0.3s">FINAL LAP!</div>
 
+        <!-- Item toast -->
+        <div id="hud-toast" style="position:absolute;top:35%;left:50%;transform:translate(-50%,-50%);
+             font-size:2.5em;color:#fff;text-shadow:3px 3px 0 #000;opacity:0;
+             transition:opacity 0.3s;pointer-events:none"></div>
+
         <!-- Minimap -->
         <canvas id="hud-minimap" width="150" height="150"
                 style="position:absolute;bottom:20px;left:20px;border-radius:10px;
@@ -302,8 +307,24 @@ export class UiManager {
       finalEl.style.opacity = data.lap === TOTAL_LAPS - 1 && data.raceTime % 4 < 2 ? '1' : '0';
     }
 
+    // Item toast
+    if (data.toast) {
+      this.showToast(data.toast);
+    }
+
     // Minimap
     this.drawMinimap(data);
+  }
+
+  private toastTimer = 0;
+
+  private showToast(message: string): void {
+    const el = document.getElementById('hud-toast');
+    if (!el) return;
+    el.textContent = message;
+    el.style.opacity = '1';
+    clearTimeout(this.toastTimer);
+    this.toastTimer = window.setTimeout(() => { el.style.opacity = '0'; }, 1500);
   }
 
   private drawMinimap(data: RaceHudData): void {
@@ -450,6 +471,7 @@ export interface RaceHudData {
   driftTier: number;
   isBoosting: boolean;
   countdown?: number;
+  toast?: string;
   minimapPoints: { x: number; y: number }[];
   minimapDots: { x: number; y: number; isHuman: boolean }[];
   standings?: { name: string; time: number; isHuman: boolean; butterflies: number; score: number }[];

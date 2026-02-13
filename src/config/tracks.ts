@@ -58,10 +58,10 @@ function rainbowMeadow(): TrackDef {
     zones: [
       // Drift zone through the left sweeper
       { start: 0.5, end: 0.7, type: 'drift' },
-      // Item pickups on the straights
-      { start: 0.05, end: 0.12, type: 'item' },
-      { start: 0.35, end: 0.42, type: 'item' },
-      { start: 0.8, end: 0.87, type: 'item' },
+      // Item pickups on the straights (wide zones so boxes are easy to hit)
+      { start: 0.02, end: 0.15, type: 'item' },
+      { start: 0.32, end: 0.45, type: 'item' },
+      { start: 0.77, end: 0.90, type: 'item' },
     ],
     available: true,
   };

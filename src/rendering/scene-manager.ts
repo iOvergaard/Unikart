@@ -3,6 +3,7 @@ import { Kart } from '../physics/kart';
 import { Track } from '../track/track';
 import { createCharacterModel, createItemBox, createButterflyMesh } from './voxel-models';
 import { ButterflyInstance } from '../gameplay/butterfly-system';
+import { ItemBox } from '../gameplay/item-system';
 import { CAMERA_DISTANCE, CAMERA_HEIGHT, CAMERA_LERP } from '../config/constants';
 
 export class SceneManager {
@@ -11,7 +12,7 @@ export class SceneManager {
   readonly camera: THREE.PerspectiveCamera;
 
   private kartMeshes: THREE.Object3D[] = [];
-  private itemBoxMeshes: THREE.Mesh[] = [];
+  private itemBoxMeshes = new Map<number, THREE.Object3D>(); // box id → mesh
   private butterflyMeshes = new Map<number, THREE.Mesh>(); // id → mesh
   knownButterflyCount = 0; // how many butterflies scene has added
   private raceObjects: THREE.Object3D[] = []; // all race-specific scene objects
@@ -75,24 +76,135 @@ export class SceneManager {
       add(barrier);
     }
 
-    // Add item boxes at item zone locations
-    for (const zone of track.zones) {
-      if (zone.type !== 'item') continue;
-      const midT = (zone.start + zone.end) / 2;
-      const pos = track.spline.getPoint(midT);
-      const right = track.spline.getRight(midT);
+    // Start/finish line (chequered pattern)
+    this.buildFinishLine(track, add);
 
-      // Place 3 boxes across the road
-      for (const offset of [-5, 0, 5]) {
-        const box = createItemBox();
-        box.position.copy(pos).add(right.clone().multiplyScalar(offset));
-        add(box);
-        this.itemBoxMeshes.push(box);
-      }
-    }
+    // Starting grid boxes
+    this.buildStartingGrid(track, add);
 
     // Add some decorative elements
     this.addScenery(track);
+  }
+
+  private buildFinishLine(track: Track, add: (obj: THREE.Object3D) => void): void {
+    const t = 0;
+    const center = track.spline.getPoint(t);
+    const right = track.spline.getRight(t);
+    const tangent = track.spline.getTangent(t);
+
+    const squares = 10;
+    const squareSize = 2;
+    const halfWidth = (squares * squareSize) / 2;
+
+    for (let col = 0; col < squares; col++) {
+      for (let row = 0; row < 2; row++) {
+        const isWhite = (col + row) % 2 === 0;
+        const geo = new THREE.PlaneGeometry(squareSize, squareSize);
+        geo.rotateX(-Math.PI / 2);
+        const mat = new THREE.MeshLambertMaterial({
+          color: isWhite ? 0xffffff : 0x222222,
+        });
+        const square = new THREE.Mesh(geo, mat);
+        square.position.copy(center)
+          .add(right.clone().multiplyScalar(-halfWidth + col * squareSize + squareSize / 2))
+          .add(tangent.clone().multiplyScalar(-squareSize / 2 + row * squareSize));
+        square.position.y = 0.02; // just above road
+        add(square);
+      }
+    }
+
+    // Finish banner (arch over the road)
+    const archHeight = 6;
+    const archWidth = halfWidth * 2 + 2;
+    // Left pole
+    const poleGeo = new THREE.BoxGeometry(0.6, archHeight, 0.6);
+    const poleMat = new THREE.MeshLambertMaterial({ color: 0xeeeeee });
+    const leftPole = new THREE.Mesh(poleGeo, poleMat);
+    leftPole.position.copy(center).add(right.clone().multiplyScalar(-halfWidth - 1));
+    leftPole.position.y = archHeight / 2;
+    add(leftPole);
+    // Right pole
+    const rightPole = new THREE.Mesh(poleGeo, poleMat);
+    rightPole.position.copy(center).add(right.clone().multiplyScalar(halfWidth + 1));
+    rightPole.position.y = archHeight / 2;
+    add(rightPole);
+    // Banner
+    const bannerGeo = new THREE.BoxGeometry(archWidth + 2, 1.2, 0.4);
+    const bannerMat = new THREE.MeshLambertMaterial({ color: 0xff69b4 });
+    const banner = new THREE.Mesh(bannerGeo, bannerMat);
+    banner.position.copy(center);
+    banner.position.y = archHeight;
+    // Rotate banner to face across the road
+    banner.quaternion.setFromUnitVectors(
+      new THREE.Vector3(1, 0, 0),
+      right.clone()
+    );
+    add(banner);
+  }
+
+  private buildStartingGrid(track: Track, add: (obj: THREE.Object3D) => void): void {
+    const startT = 0.98;
+    const center = track.spline.getPoint(startT);
+    const tangent = track.spline.getTangent(startT);
+    const right = track.spline.getRight(startT);
+
+    const boxWidth = 4.5;
+    const boxLength = 4;
+
+    for (let i = 0; i < 8; i++) {
+      const row = Math.floor(i / 2);
+      const col = (i % 2) === 0 ? -1 : 1;
+
+      const pos = center.clone()
+        .add(tangent.clone().multiplyScalar(-row * 5))
+        .add(right.clone().multiplyScalar(col * 3));
+
+      // Grid box outline (4 thin white lines forming a rectangle)
+      const lineThickness = 0.15;
+      const lineMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+
+      // Front and back lines
+      for (const zOff of [-boxLength / 2, boxLength / 2]) {
+        const geo = new THREE.PlaneGeometry(boxWidth, lineThickness);
+        geo.rotateX(-Math.PI / 2);
+        const line = new THREE.Mesh(geo, lineMat);
+        line.position.copy(pos).add(tangent.clone().multiplyScalar(zOff));
+        line.position.y = 0.02;
+        // Rotate to align with road direction
+        line.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), right);
+        add(line);
+      }
+
+      // Left and right lines
+      for (const xOff of [-boxWidth / 2, boxWidth / 2]) {
+        const geo = new THREE.PlaneGeometry(lineThickness, boxLength);
+        geo.rotateX(-Math.PI / 2);
+        const line = new THREE.Mesh(geo, lineMat);
+        line.position.copy(pos).add(right.clone().multiplyScalar(xOff));
+        line.position.y = 0.02;
+        line.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+        add(line);
+      }
+
+      // Position number
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = 'bold 48px cursive';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`${i + 1}`, 32, 32);
+      const texture = new THREE.CanvasTexture(canvas);
+      const numGeo = new THREE.PlaneGeometry(2.5, 2.5);
+      numGeo.rotateX(-Math.PI / 2);
+      const numMat = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+      const numMesh = new THREE.Mesh(numGeo, numMat);
+      numMesh.position.copy(pos);
+      numMesh.position.y = 0.03;
+      add(numMesh);
+    }
   }
 
   /** Create 3D models for all karts and add to scene */
@@ -102,6 +214,30 @@ export class SceneManager {
       this.scene.add(model);
       this.kartMeshes.push(model);
       kart.mesh = model;
+    }
+  }
+
+  /** Create item box meshes from ItemSystem data */
+  setupItemBoxes(boxes: ItemBox[]): void {
+    for (const box of boxes) {
+      const mesh = createItemBox();
+      mesh.position.copy(box.position);
+      this.scene.add(mesh);
+      this.raceObjects.push(mesh);
+      this.itemBoxMeshes.set(box.id, mesh);
+    }
+  }
+
+  /** Sync item box visibility + animate */
+  updateItemBoxes(boxes: ItemBox[], time: number): void {
+    for (const box of boxes) {
+      const mesh = this.itemBoxMeshes.get(box.id);
+      if (!mesh) continue;
+      mesh.visible = box.active;
+      if (box.active) {
+        mesh.rotation.y = time * 1.0;
+        mesh.position.y = 1.8 + Math.sin(time * 2 + box.id) * 0.3;
+      }
     }
   }
 
@@ -174,13 +310,6 @@ export class SceneManager {
       }
     }
 
-    // Rotate item boxes
-    const rotSpeed = Date.now() * 0.001;
-    for (const box of this.itemBoxMeshes) {
-      box.rotation.y = rotSpeed;
-      box.position.y = 1 + Math.sin(rotSpeed * 2 + box.position.x) * 0.3;
-    }
-
     // ── Chase camera ──
     const fwd = humanKart.forward;
     const desiredPos = humanKart.position.clone()
@@ -211,7 +340,7 @@ export class SceneManager {
     for (const mesh of this.kartMeshes) this.scene.remove(mesh);
     this.raceObjects = [];
     this.kartMeshes = [];
-    this.itemBoxMeshes = [];
+    this.itemBoxMeshes.clear();
     this.butterflyMeshes.clear();
     this.knownButterflyCount = 0;
   }
