@@ -122,12 +122,14 @@ function startRace(): void {
   minimapPoints = computeMinimapPoints(track);
 
   audio.startRace();
+  input.setTouchControlsVisible(true);
   state.transition('countdown');
 }
 
 function endRace(): void {
   if (race) {
     audio.stopRace();
+    input.setTouchControlsVisible(false);
     scene.cleanup();
     race = null;
     track = null;
@@ -137,6 +139,7 @@ function endRace(): void {
 // ── Events ───────────────────────────────────────────────
 events.on('player-finished', (position: number) => {
   audio.stopRace();
+  input.setTouchControlsVisible(false);
   // Show results after a short delay
   setTimeout(() => {
     if (race) {
