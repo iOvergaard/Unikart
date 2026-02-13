@@ -43,9 +43,9 @@ src/ui/                        ← DOM-based menus + HUD (ui-manager.ts)
 
 **Drift-Boost** (`physics/drift-boost.ts`): State machine: `idle → charging → boosting → cooldown`. Tier thresholds at 0.35s/0.7s/1.05s of charge time. Boost durations: Tier 1 = 0.7s, Tier 2 = 1.1s, Tier 3 = 1.5s. All at 1.35× speed multiplier. Drift zones charge 1.5× faster.
 
-**AI** (`ai/ai-controller.ts`): Spline-following with lane offsets. Decides steering, drift timing, item usage every ~0.3-0.7s. Personality from character's `aiTendency` (aggressive, drift-happy, defensive, item-focused, smooth, balanced, pusher). Difficulty from `ai/difficulty.ts` profiles.
+**AI** (`ai/ai-controller.ts`): Spline-following with lane offsets. Speed-adaptive look-ahead (4-8% of track). Decides steering, drift timing, item usage every ~0.3-0.7s. Personality from character's `aiTendency` (aggressive, drift-happy, defensive, item-focused, smooth, balanced, pusher). Difficulty from `ai/difficulty.ts` profiles — `accelMult`, `speedMult`, `stunRecovery` all actively applied. Drift timing aligned with actual tier thresholds.
 
-**Collision** (`physics/collision.ts`): Kart↔barrier (gentle push-back, never stop dead) and kart↔kart (weight-based separation, gentle bumps). Called once per physics frame.
+**Collision** (`physics/collision.ts`): Kart↔barrier (gentle push-back, never stop dead) and kart↔kart (weight-based separation, gentle bumps). Called once per physics frame. 2-second grace period at race start — kart-kart collisions disabled to prevent grid pile-ups.
 
 **Items** (`gameplay/item-system.ts`): 3 items with position-weighted rolls. Gust = 0.6s steering lock, Wobble = 1.2s at 50% speed, Turbo = 1.5s self-boost. One-item capacity. Individual item boxes with proximity pickup (radius 3), disappear on pickup and respawn after 5s. Rainbow gift-box meshes with "?" label. Toast messages on item use ("⚡ TURBO!", "💨 Gust hit X!").
 
@@ -53,7 +53,7 @@ src/ui/                        ← DOM-based menus + HUD (ui-manager.ts)
 
 **Butterfly System** (`gameplay/butterfly-system.ts`): Manages butterfly collectibles on the track. Spawns 9 initial clusters of 4 butterflies each, plus new clusters every 3-5s. Collection radius 3 units — all karts (human + AI) collect. Scoring: position bonus (1st=10..8th=0) + butterfly count = combined score.
 
-**Audio** (`audio/audio-manager.ts`): Hybrid approach — Tone.js oscillators for continuous sounds (engine hum, drift charge) and Kenney CC0 `.ogg` samples for one-shots (UI clicks, item pickup/use, boost, countdown, lap chime, butterfly collect, bump). Polls human kart state each frame to detect changes (no events emitted from other systems). Web Audio unlocks on first UI interaction via `Tone.start()`. Signal chain: each source → sfx bus or engine bus → master gain → destination. Volume sliders control bus gains.
+**Audio** (`audio/audio-manager.ts`): Hybrid approach — Tone.js oscillators for continuous sounds (engine hum, drift charge) and Kenney CC0 `.mp3` samples for one-shots (UI clicks, item pickup/use, boost, countdown, lap chime, butterfly collect, bump). Polls human kart state each frame to detect changes (no events emitted from other systems). Web Audio unlocks on first UI interaction via `Tone.start()` (awaited properly for mobile). Signal chain: each source → sfx bus or engine bus → master gain → destination. Volume sliders control bus gains.
 
 ### Data Flow During a Race Frame
 
@@ -137,11 +137,18 @@ Butterflies are the main collectible. They spawn as clusters of 4 along the road
 | Use Item | Shift / X | LB / LT |
 | Pause | Escape / P | Start |
 
+### Auto-Accelerate
+
+Toggle in race settings (ON by default). When enabled, the kart drives forward automatically — the player only needs to steer, drift, and use items. Designed for younger players. Stored in `GameState.autoAccelerate`, synced to `InputManager.autoAccelerate` each frame.
+
+### Input Edge Detection
+
+Item and pause presses use event-driven pending flags (set on `keydown`, consumed in `update()`) to prevent fast taps from being lost between polling frames. Touch item button also sets the pending flag.
+
 ### Mobile Touch Controls
 
 Auto-detected via `ontouchstart` / `maxTouchPoints`. Created in `InputManager.createTouchControls()`. Overlay shown during countdown + racing, hidden on results/menus via `setTouchControlsVisible()`.
 
-- **Auto-accelerate**: Kart drives forward automatically on touch devices (no gas button)
 - **Left side**: ◀ ▶ steering buttons
 - **Right side**: 💨 drift (large) + 🎁 item (smaller)
 - Touch state merges with keyboard/gamepad in `update()` — all three input sources are additive
@@ -152,22 +159,22 @@ Deployed to GitHub Pages via `.github/workflows/deploy.yml` on every push to `ma
 
 ## Audio System
 
-Hybrid: Tone.js oscillators for continuous sounds + Kenney CC0 `.ogg` samples for one-shots. Samples in `public/audio/`.
+Hybrid: Tone.js oscillators for continuous sounds + Kenney CC0 `.mp3` samples for one-shots. Samples in `public/audio/` (converted from OGG to MP3 for Safari/iOS compatibility).
 
 | Sound | Source | Trigger |
 |-------|--------|---------|
 | Engine hum | Tone.js sawtooth osc + low-pass | Continuous during race, pitch/volume tracks speed |
 | Drift charge | Tone.js square osc | Held drift, pitch steps per tier (220/330/440 Hz) |
-| Boost whoosh | `upgrade1.ogg` | Drift released with tier ≥1 |
-| UI click | `click_003.ogg` | Any button press |
-| Item pickup | `pickup2.ogg` | heldItem null → value |
-| Turbo use | `upgrade3.ogg` | Player uses turbo |
-| Gust use | `laser2.ogg` | Player uses gust |
-| Wobble use | `hurt3.ogg` | Player uses wobble |
-| Countdown | `bong_001.ogg` | Each second (3, 2, 1); GO = 1.5× playback rate |
-| Lap chime | `confirmation_002.ogg` | Crossing start/finish line |
-| Butterfly collect | `coin3.ogg` | Butterfly count increases |
-| Bump | `impactSoft_medium_001.ogg` | *Loaded but not yet wired* |
+| Boost whoosh | `upgrade1.mp3` | Drift released with tier ≥1 |
+| UI click | `click_003.mp3` | Any button press |
+| Item pickup | `pickup2.mp3` | heldItem null → value |
+| Turbo use | `upgrade3.mp3` | Player uses turbo |
+| Gust use | `laser2.mp3` | Player uses gust |
+| Wobble use | `hurt3.mp3` | Player uses wobble |
+| Countdown | `bong_001.mp3` | Each second (3, 2, 1); GO = 1.5× playback rate |
+| Lap chime | `confirmation_002.mp3` | Crossing start/finish line |
+| Butterfly collect | `coin3.mp3` | Butterfly count increases |
+| Bump | `impactSoft_medium_001.mp3` | *Loaded but not yet wired* |
 
 Detection uses polling: `AudioManager.update()` compares current kart state against previous-frame snapshots. No events emitted from physics/gameplay systems.
 
