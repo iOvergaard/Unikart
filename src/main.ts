@@ -136,6 +136,7 @@ function endRace(): void {
 
 // ── Events ───────────────────────────────────────────────
 events.on('player-finished', (position: number) => {
+  audio.stopRace();
   // Show results after a short delay
   setTimeout(() => {
     if (race) {
@@ -145,6 +146,7 @@ events.on('player-finished', (position: number) => {
 });
 
 events.on('race-finished', () => {
+  audio.stopRace();
   if (state.screen !== 'results') {
     state.transition('results');
   }

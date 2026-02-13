@@ -23,6 +23,7 @@ src/track/                     ← Catmull-Rom spline, procedural road mesh, tra
 src/rendering/                 ← Three.js scene, voxel model builder, chase camera
 src/ai/                        ← AI controller, difficulty profiles
 src/gameplay/                  ← Race manager (orchestrator), item system, butterfly system
+src/audio/                     ← Audio manager (Tone.js engine + Kenney CC0 samples)
 src/ui/                        ← DOM-based menus + HUD (ui-manager.ts)
 ```
 
@@ -52,6 +53,8 @@ src/ui/                        ← DOM-based menus + HUD (ui-manager.ts)
 
 **Butterfly System** (`gameplay/butterfly-system.ts`): Manages butterfly collectibles on the track. Spawns 9 initial clusters of 4 butterflies each, plus new clusters every 3-5s. Collection radius 3 units — all karts (human + AI) collect. Scoring: position bonus (1st=10..8th=0) + butterfly count = combined score.
 
+**Audio** (`audio/audio-manager.ts`): Hybrid approach — Tone.js oscillators for continuous sounds (engine hum, drift charge) and Kenney CC0 `.ogg` samples for one-shots (UI clicks, item pickup/use, boost, countdown, lap chime, butterfly collect, bump). Polls human kart state each frame to detect changes (no events emitted from other systems). Web Audio unlocks on first UI interaction via `Tone.start()`. Signal chain: each source → sfx bus or engine bus → master gain → destination. Volume sliders control bus gains.
+
 ### Data Flow During a Race Frame
 
 ```
@@ -63,10 +66,11 @@ src/ui/                        ← DOM-based menus + HUD (ui-manager.ts)
    d. Update race progress (spline parameter → lap detection)
    e. Item pickups (proximity to item boxes → weighted roll, box respawn timer)
    f. Butterfly collection (proximity check → kart.butterflies++)
-3. scene: sync item box visibility, add/remove butterfly meshes, animate both
-4. scene.updateFrame(karts, humanKart, dt) — sync meshes, camera, particles
-5. scene.render()                    — Three.js draw call
-6. ui.show(screen, state, hudData)   — update HUD numbers, toasts (or rebuild if screen changed)
+3. audio.update(dt, humanKart, race) — poll state diffs → trigger sounds
+4. scene: sync item box visibility, add/remove butterfly meshes, animate both
+5. scene.updateFrame(karts, humanKart, dt) — sync meshes, camera, particles
+6. scene.render()                    — Three.js draw call
+7. ui.show(screen, state, hudData)   — update HUD numbers, toasts (or rebuild if screen changed)
 ```
 
 ## The 8 Unicorns
@@ -133,21 +137,38 @@ Butterflies are the main collectible. They spawn as clusters of 4 along the road
 | Use Item | Shift / X | LB / LT |
 | Pause | Escape / P | Start |
 
+## Audio System
+
+Hybrid: Tone.js oscillators for continuous sounds + Kenney CC0 `.ogg` samples for one-shots. Samples in `public/audio/`.
+
+| Sound | Source | Trigger |
+|-------|--------|---------|
+| Engine hum | Tone.js sawtooth osc + low-pass | Continuous during race, pitch/volume tracks speed |
+| Drift charge | Tone.js square osc | Held drift, pitch steps per tier (220/330/440 Hz) |
+| Boost whoosh | `upgrade1.ogg` | Drift released with tier ≥1 |
+| UI click | `click_003.ogg` | Any button press |
+| Item pickup | `pickup2.ogg` | heldItem null → value |
+| Turbo use | `upgrade3.ogg` | Player uses turbo |
+| Gust use | `laser2.ogg` | Player uses gust |
+| Wobble use | `hurt3.ogg` | Player uses wobble |
+| Countdown | `bong_001.ogg` | Each second (3, 2, 1); GO = 1.5× playback rate |
+| Lap chime | `confirmation_002.ogg` | Crossing start/finish line |
+| Butterfly collect | `coin3.ogg` | Butterfly count increases |
+| Bump | `impactSoft_medium_001.ogg` | *Loaded but not yet wired* |
+
+Detection uses polling: `AudioManager.update()` compares current kart state against previous-frame snapshots. No events emitted from physics/gameplay systems.
+
 ## Known Issues & What Needs Work
 
 ### Bugs to Fix
 - **Menu re-selection**: `select-track` and `select-character` actions call `state.transition()` to re-render, but since the `show()` short-circuit now prevents re-render on same screen, selecting a different track/character won't visually update. Fix: add a `forceRedraw()` method or track selection state separately.
 
 ### Not Yet Implemented (Phase 8: Audio & Polish)
-- **Audio**: No sounds at all currently. Need:
-  - Engine hum (pitch-shifted by speed)
-  - Drift charge sound (escalating pitch for tier 1→2→3)
-  - Boost release whoosh
-  - Item pickup ding
-  - Item hit effects (gust whoosh, wobble buzz)
-  - Wall/kart bump sound
-  - UI click sounds
-  - One music loop per track (can use Tone.js for procedural or a royalty-free loop)
+- **Audio — done so far**: Engine hum, drift charge, boost whoosh, UI clicks, item pickup, item use (turbo/gust/wobble), countdown beeps, lap chime, butterfly collect. All via `audio/audio-manager.ts`.
+- **Audio — still needed**:
+  - Collision bump sound (sample loaded, `playBump()` exists, not yet wired to collision system)
+  - Music loop per track (no music at all yet)
+  - Item *hit* sounds (when an opponent hits you with gust/wobble — currently only item *use* has sound)
 - **VFX Polish**: Drift particles exist but are basic. Need:
   - Better boost speed lines
   - Item hit visual effects (gust = dust cloud, wobble = shake, turbo = glow)
@@ -177,8 +198,8 @@ Butterflies are the main collectible. They spawn as clusters of 4 along the road
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `src/main.ts` | 295 | Entry point, game loop, UI wiring |
-| `src/config/constants.ts` | 48 | All physics/game tuning values |
+| `src/main.ts` | 312 | Entry point, game loop, UI + audio wiring |
+| `src/config/constants.ts` | 57 | All physics/game/audio tuning values |
 | `src/config/characters.ts` | 103 | 8 unicorn character definitions |
 | `src/config/items.ts` | 67 | 3 item definitions + roll logic |
 | `src/config/tracks.ts` | 90 | Track definitions (1 built, 7 stubs) |
@@ -197,4 +218,5 @@ Butterflies are the main collectible. They spawn as clusters of 4 along the road
 | `src/gameplay/race-manager.ts` | 206 | Race orchestration |
 | `src/gameplay/butterfly-system.ts` | 101 | Butterfly spawning, collection, scoring |
 | `src/gameplay/item-system.ts` | 141 | Item box pickup/respawn, usage/effects, toast |
+| `src/audio/audio-manager.ts` | 251 | Tone.js engine + Kenney sample players, state-polling |
 | `src/ui/ui-manager.ts` | 484 | All UI screens + HUD + butterfly counter + toasts |
