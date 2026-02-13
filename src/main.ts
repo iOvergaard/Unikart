@@ -8,12 +8,14 @@ import { Track } from './track/track';
 import { TRACKS } from './config/tracks';
 import { FIXED_DT, TOTAL_LAPS } from './config/constants';
 import { computeScore } from './gameplay/butterfly-system';
+import { AudioManager } from './audio/audio-manager';
 
 // ── Bootstrap ────────────────────────────────────────────
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 const state = new GameState();
 const input = new InputManager();
 const scene = new SceneManager(canvas);
+const audio = new AudioManager();
 let race: RaceManager | null = null;
 let track: Track | null = null;
 
@@ -23,6 +25,8 @@ let minimapBounds = { minX: 0, minZ: 0, scale: 1, padding: 15 };
 
 // ── UI Manager ───────────────────────────────────────────
 const ui = new UiManager((action, value) => {
+  audio.resume();
+  audio.playUiClick();
   switch (action) {
     // Main menu
     case 'play':
@@ -86,9 +90,11 @@ const ui = new UiManager((action, value) => {
     // Options
     case 'music-volume':
       state.musicVolume = parseInt(value) / 100;
+      audio.setMusicVolume(state.musicVolume);
       break;
     case 'sfx-volume':
       state.sfxVolume = parseInt(value) / 100;
+      audio.setSfxVolume(state.sfxVolume);
       break;
   }
 });
@@ -114,11 +120,13 @@ function startRace(): void {
   // Pre-compute minimap points
   minimapPoints = computeMinimapPoints(track);
 
+  audio.startRace();
   state.transition('countdown');
 }
 
 function endRace(): void {
   if (race) {
+    audio.stopRace();
     scene.cleanup();
     race = null;
     track = null;
@@ -169,12 +177,21 @@ function gameLoop(time: number): void {
 
       // Human item usage
       if (input.itemPressed && state.screen === 'racing') {
+        const itemId = race.humanKart.heldItem;
         const result = race.usePlayerItem();
-        if (result) pendingToast = result;
+        if (result && itemId) {
+          pendingToast = result;
+          audio.playItemUse(itemId);
+        }
       }
 
       accumulator -= FIXED_DT;
     }
+  }
+
+  // ── Audio ──
+  if (race) {
+    audio.update(dt, race.humanKart, race);
   }
 
   // ── Rendering ──

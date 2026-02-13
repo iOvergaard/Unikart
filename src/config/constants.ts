@@ -50,3 +50,8 @@ export const VOXEL_SIZE = 0.3;
 export const CAMERA_DISTANCE = 12;
 export const CAMERA_HEIGHT = 6;
 export const CAMERA_LERP = 4;       // how quickly camera follows
+
+// ── Audio ────────────────────────────────────────────────
+export const ENGINE_BASE_FREQ = 80;
+export const ENGINE_MAX_FREQ = 400;
+export const DRIFT_CHARGE_FREQS = [220, 330, 440]; // tier 1, 2, 3
