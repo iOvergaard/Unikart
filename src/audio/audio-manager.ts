@@ -219,6 +219,18 @@ export class AudioManager {
     // No music loop yet; placeholder for Phase 8 music
   }
 
+  /** Mute all audio (e.g. when paused) */
+  mute(): void {
+    if (!this.started) return;
+    this.masterGain.gain.value = 0;
+  }
+
+  /** Unmute all audio (e.g. when resuming) */
+  unmute(): void {
+    if (!this.started) return;
+    this.masterGain.gain.value = 0.8;
+  }
+
   /** Start continuous sounds at race begin */
   startRace(): void {
     if (!this.started) return;

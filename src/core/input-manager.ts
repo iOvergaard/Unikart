@@ -174,8 +174,27 @@ export class InputManager {
     rightGroup.appendChild(btnItem);
     rightGroup.appendChild(btnDrift);
 
+    // Pause button (top-right, outside the bottom bar)
+    const btnPause = document.createElement('div');
+    btnPause.textContent = '⏸';
+    btnPause.style.cssText = `
+      position: fixed; top: 12px; right: 12px;
+      width: 44px; height: 44px; border-radius: 22px;
+      background: rgba(0,0,0,0.35); border: 2px solid rgba(255,255,255,0.4);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; color: #fff;
+      pointer-events: auto; touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+      z-index: 1001;
+    `;
+    btnPause.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      this.pendingPause = true;
+    }, { passive: false });
+
     overlay.appendChild(leftGroup);
     overlay.appendChild(rightGroup);
+    overlay.appendChild(btnPause);
     document.body.appendChild(overlay);
     this.touchControls = overlay;
   }

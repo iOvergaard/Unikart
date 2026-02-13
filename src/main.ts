@@ -80,6 +80,7 @@ const ui = new UiManager((action, value) => {
     // In-race
     case 'resume':
       state.transition('racing');
+      audio.unmute();
       break;
     case 'restart':
       startRace();
@@ -174,8 +175,10 @@ function gameLoop(time: number): void {
   // Handle pause toggle
   if (input.pausePressed && state.screen === 'racing') {
     state.transition('paused');
+    audio.mute();
   } else if (input.pausePressed && state.screen === 'paused') {
     state.transition('racing');
+    audio.unmute();
   }
 
   // ── Physics (fixed timestep) ──
