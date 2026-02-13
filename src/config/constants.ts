@@ -34,7 +34,7 @@ export const ITEM_GUST_STEER_LOCK = 0.6;     // seconds
 export const ITEM_WOBBLE_DURATION = 1.2;      // seconds
 export const ITEM_WOBBLE_SPEED_MULT = 0.5;
 export const ITEM_TURBO_DURATION = 2.5;       // seconds
-export const ITEM_TURBO_MULTIPLIER = 1.55;
+export const ITEM_TURBO_MULTIPLIER = 2.5;
 
 // ── Race ─────────────────────────────────────────────────
 export const TOTAL_LAPS = 3;
