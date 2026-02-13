@@ -23,30 +23,31 @@ const SAMPLES = {
   butterfly: 'audio/coin3.mp3',
 } as const;
 
+type SampleName = keyof typeof SAMPLES;
+
 export class AudioManager {
   private started = false;
 
-  // ── Gain buses ──
-  private masterGain!: Tone.Gain;
-  private sfxBus!: Tone.Gain;
-  private engineBus!: Tone.Gain;
+  // ── Native Web Audio for samples (iOS-compatible) ──
+  private ctx: AudioContext | null = null;
+  private sampleBuffers: Partial<Record<SampleName, AudioBuffer>> = {};
+  private sfxGain: GainNode | null = null;
+  private masterGainNode: GainNode | null = null;
 
-  // ── Engine (layered oscillators for richer sound) ──
+  // ── Tone.js for oscillators ──
+  private toneStarted = false;
   private engineOsc!: Tone.Oscillator;
   private engineOscHigh!: Tone.Oscillator;
   private engineOscSub!: Tone.Oscillator;
   private engineFilter!: Tone.Filter;
   private engineLfo!: Tone.LFO;
   private engineLfoGain!: Tone.Gain;
+  private engineBus!: Tone.Gain;
   private engineRunning = false;
 
-  // ── Drift charge (square wave, starts silent) ──
   private driftOsc!: Tone.Oscillator;
   private driftGain!: Tone.Gain;
   private driftRunning = false;
-
-  // ── Sample players ──
-  private players: Record<keyof typeof SAMPLES, Tone.Player> = {} as any;
 
   // ── Previous-state tracking ──
   private prevDriftCharging = false;
@@ -60,25 +61,58 @@ export class AudioManager {
   /** Call on first user interaction to unlock Web Audio */
   async resume(): Promise<void> {
     if (this.started) return;
+
+    // Create native AudioContext for samples
+    this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (this.ctx.state === 'suspended') {
+      await this.ctx.resume();
+    }
+
+    // Gain chain: sfxGain → masterGain → destination
+    this.masterGainNode = this.ctx.createGain();
+    this.masterGainNode.gain.value = 0.8;
+    this.masterGainNode.connect(this.ctx.destination);
+
+    this.sfxGain = this.ctx.createGain();
+    this.sfxGain.gain.value = 0.8;
+    this.sfxGain.connect(this.masterGainNode);
+
+    // Start loading samples in background
+    this.loadAllSamples();
+
+    // Start Tone.js for oscillators
     await Tone.start();
-    this.initNodes();
+    this.toneStarted = true;
+    this.initToneNodes();
+
     this.started = true;
   }
 
-  /** Create all Tone.js nodes — called only after user gesture */
-  private initNodes(): void {
-    // Master → destination
-    this.masterGain = new Tone.Gain(0.8).toDestination();
+  /** Load all samples via fetch + decodeAudioData (iOS-safe) */
+  private async loadAllSamples(): Promise<void> {
+    if (!this.ctx) return;
+    const entries = Object.entries(SAMPLES) as [SampleName, string][];
+    await Promise.all(entries.map(async ([name, url]) => {
+      try {
+        const res = await fetch(url);
+        const buf = await res.arrayBuffer();
+        this.sampleBuffers[name] = await this.ctx!.decodeAudioData(buf);
+      } catch {
+        // Silently skip failed loads
+      }
+    }));
+  }
 
-    // Buses → master
-    this.sfxBus = new Tone.Gain(0.8).connect(this.masterGain);
-    this.engineBus = new Tone.Gain(0.15).connect(this.masterGain);
+  /** Create Tone.js oscillator nodes */
+  private initToneNodes(): void {
+    // Engine bus (connects to Tone destination — separate from native ctx)
+    this.engineBus = new Tone.Gain(0.15).toDestination();
 
-    // ── Engine: LFO-modulated amplitude for idle "putt-putt" ──
+    // LFO-modulated amplitude for idle "putt-putt"
     this.engineLfoGain = new Tone.Gain(1).connect(this.engineBus);
     this.engineLfo = new Tone.LFO(8, 0.3, 1).connect(this.engineLfoGain.gain);
 
-    // ── Engine: layered oscillators → shared filter → LFO gain → bus ──
+    // Layered oscillators → shared filter → LFO gain → bus
     this.engineFilter = new Tone.Filter(300, 'lowpass', -24).connect(this.engineLfoGain);
     this.engineOsc = new Tone.Oscillator(ENGINE_BASE_FREQ, 'sawtooth').connect(this.engineFilter);
     this.engineOscHigh = new Tone.Oscillator(ENGINE_BASE_FREQ * 2, 'square').connect(this.engineFilter);
@@ -86,14 +120,9 @@ export class AudioManager {
     this.engineOscSub = new Tone.Oscillator(ENGINE_BASE_FREQ * 0.5, 'triangle').connect(this.engineFilter);
     this.engineOscSub.volume.value = -8;
 
-    // ── Drift charge (square wave, starts silent) ──
-    this.driftGain = new Tone.Gain(0).connect(this.sfxBus);
+    // Drift charge (square wave, starts silent)
+    this.driftGain = new Tone.Gain(0).toDestination();
     this.driftOsc = new Tone.Oscillator(DRIFT_CHARGE_FREQS[0], 'square').connect(this.driftGain);
-
-    // ── Load all samples ──
-    for (const [key, url] of Object.entries(SAMPLES)) {
-      this.players[key as keyof typeof SAMPLES] = new Tone.Player(url).connect(this.sfxBus);
-    }
   }
 
   /** Called each frame during a race */
@@ -103,19 +132,15 @@ export class AudioManager {
     // ── Engine pitch + volume + LFO ──
     if (this.engineRunning) {
       const speedRatio = Math.min(Math.abs(humanKart.speed) / (humanKart.baseMaxSpeed || BASE_MAX_SPEED), 1);
-      // Slight curve so low speeds feel more "idle-ish"
       const curve = speedRatio * speedRatio * 0.4 + speedRatio * 0.6;
       const freq = ENGINE_BASE_FREQ + (ENGINE_MAX_FREQ - ENGINE_BASE_FREQ) * curve;
       this.engineOsc.frequency.value = freq;
       this.engineOscHigh.frequency.value = freq * 2;
       this.engineOscSub.frequency.value = freq * 0.5;
-      // Filter opens up with speed
       this.engineFilter.frequency.value = 180 + 900 * curve;
-      // LFO: slow chug at idle (6 Hz), fast at speed (20 Hz), less depth at speed
       this.engineLfo.frequency.value = 6 + 14 * speedRatio;
-      this.engineLfo.min = 0.3 + 0.6 * speedRatio; // at full speed min→0.9 (almost no wobble)
+      this.engineLfo.min = 0.3 + 0.6 * speedRatio;
       this.engineLfo.max = 1;
-      // Volume: rises to mid-speed then eases at top speed
       const vol = speedRatio < 0.6
         ? 0.1 + 0.9 * (speedRatio / 0.6)
         : 1.0 - 0.3 * ((speedRatio - 0.6) / 0.4);
@@ -165,7 +190,6 @@ export class AudioManager {
       if (sec !== this.prevCountdownSec && sec >= 1 && sec <= 3) {
         this.playSample('countdown');
       }
-      // GO beep — play countdown sample at higher playback rate
       if (this.prevCountdownSec >= 1 && sec <= 0) {
         this.playSample('countdown', 1.5);
       }
@@ -184,15 +208,9 @@ export class AudioManager {
   playItemUse(itemId: ItemId): void {
     if (!this.started) return;
     switch (itemId) {
-      case 'turbo':
-        this.playSample('turbo');
-        break;
-      case 'gust':
-        this.playSample('gust');
-        break;
-      case 'wobble':
-        this.playSample('wobble');
-        break;
+      case 'turbo': this.playSample('turbo'); break;
+      case 'gust': this.playSample('gust'); break;
+      case 'wobble': this.playSample('wobble'); break;
     }
   }
 
@@ -210,32 +228,31 @@ export class AudioManager {
 
   /** Set SFX volume (0..1) */
   setSfxVolume(v: number): void {
-    if (!this.started) return;
-    this.sfxBus.gain.value = v;
+    if (this.sfxGain) this.sfxGain.gain.value = v;
   }
 
   /** Set music volume (0..1) — reserved for future music loop */
   setMusicVolume(_v: number): void {
-    // No music loop yet; placeholder for Phase 8 music
+    // No music loop yet
   }
 
   /** Mute all audio (e.g. when paused) */
   mute(): void {
-    if (!this.started) return;
-    this.masterGain.gain.value = 0;
+    if (this.masterGainNode) this.masterGainNode.gain.value = 0;
+    if (this.toneStarted) Tone.getDestination().volume.value = -Infinity;
   }
 
   /** Unmute all audio (e.g. when resuming) */
   unmute(): void {
-    if (!this.started) return;
-    this.masterGain.gain.value = 0.8;
+    if (this.masterGainNode) this.masterGainNode.gain.value = 0.8;
+    if (this.toneStarted) Tone.getDestination().volume.value = 0;
   }
 
   /** Start continuous sounds at race begin */
   startRace(): void {
     if (!this.started) return;
     this.resetPrevState();
-    if (!this.engineRunning) {
+    if (!this.engineRunning && this.toneStarted) {
       this.engineOsc.start();
       this.engineOscHigh.start();
       this.engineOscSub.start();
@@ -260,15 +277,21 @@ export class AudioManager {
 
   // ── Internal helpers ──
 
-  private playSample(name: keyof typeof SAMPLES, playbackRate = 1): void {
-    const player = this.players[name];
-    if (!player || !player.loaded) return;
-    player.playbackRate = playbackRate;
-    player.start();
+  /** Play a sample using native Web Audio API */
+  private playSample(name: SampleName, playbackRate = 1): void {
+    if (!this.ctx || !this.sfxGain) return;
+    const buffer = this.sampleBuffers[name];
+    if (!buffer) return;
+
+    const source = this.ctx.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.value = playbackRate;
+    source.connect(this.sfxGain);
+    source.start(0);
   }
 
   private startDriftCharge(): void {
-    if (this.driftRunning) return;
+    if (this.driftRunning || !this.toneStarted) return;
     this.driftGain.gain.value = 0.15;
     this.driftOsc.frequency.value = DRIFT_CHARGE_FREQS[0];
     this.driftOsc.start();
