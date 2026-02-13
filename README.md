@@ -4,6 +4,8 @@ A browser-based 3D voxel kart racing game built with Three.js, TypeScript and Vi
 
 Made for Hannah (age 6).
 
+**Play now: https://snebold.dk/Unikart/**
+
 ## Getting Started
 
 ```bash
