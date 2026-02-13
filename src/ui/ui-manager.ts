@@ -87,7 +87,7 @@ export class UiManager {
       <div style="display:flex;flex-direction:column;align-items:center;padding:20px;height:100%;background:rgba(0,0,0,0.7);overflow-y:auto">
         <h2 style="color:#fff;font-family:cursive;font-size:2em;margin-bottom:20px">Choose a Track!</h2>
         <div class="card-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:15px;max-width:900px">${trackCards}</div>
-        <div style="margin-top:30px">
+        <div class="nav-btns" style="margin-top:30px">
           <button class="menu-btn" data-action="next-to-character">Next →</button>
           <button class="menu-btn" data-action="back-to-menu" style="background:#eee;color:#999">← Back</button>
         </div>
@@ -128,7 +128,7 @@ export class UiManager {
       <div style="display:flex;flex-direction:column;align-items:center;padding:20px;height:100%;background:rgba(0,0,0,0.7);overflow-y:auto">
         <h2 style="color:#fff;font-family:cursive;font-size:2em;margin-bottom:20px">Choose Your Racer!</h2>
         <div class="card-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:800px">${charCards}</div>
-        <div style="margin-top:30px">
+        <div class="nav-btns" style="margin-top:30px">
           <button class="menu-btn" data-action="next-to-settings">Next →</button>
           <button class="menu-btn" data-action="back-to-tracks" style="background:#eee;color:#999">← Back</button>
         </div>
