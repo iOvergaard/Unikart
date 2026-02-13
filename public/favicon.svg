@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FF69B4"/>
+      <stop offset="100%" stop-color="#9B30FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+
+  <!-- Horn (gold, slightly angled) -->
+  <polygon points="256,52 228,188 284,188" fill="#FFD700"/>
+  <polygon points="256,52 242,120 270,120" fill="#FFF8DC" opacity="0.45"/>
+
+  <!-- Ears -->
+  <polygon points="138,215 162,125 198,210" fill="#FF69B4"/>
+  <polygon points="374,215 350,125 314,210" fill="#FF69B4"/>
+  <polygon points="150,208 166,148 190,205" fill="#FFB6C1"/>
+  <polygon points="362,208 346,148 322,205" fill="#FFB6C1"/>
+
+  <!-- Face (white rounded) -->
+  <ellipse cx="256" cy="310" rx="148" ry="165" fill="white"/>
+
+  <!-- Eyes -->
+  <circle cx="198" cy="288" r="24" fill="#2D1B4E"/>
+  <circle cx="314" cy="288" r="24" fill="#2D1B4E"/>
+  <circle cx="206" cy="279" r="9" fill="white"/>
+  <circle cx="322" cy="279" r="9" fill="white"/>
+
+  <!-- Cheeks -->
+  <circle cx="160" cy="348" r="28" fill="#FFB6C1" opacity="0.55"/>
+  <circle cx="352" cy="348" r="28" fill="#FFB6C1" opacity="0.55"/>
+
+  <!-- Nose -->
+  <ellipse cx="256" cy="368" rx="18" ry="11" fill="#FFB6C1"/>
+
+  <!-- Smile -->
+  <path d="M232 394 Q256 418 280 394" stroke="#2D1B4E" stroke-width="5" fill="none" stroke-linecap="round"/>
+</svg>
