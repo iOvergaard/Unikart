@@ -93,7 +93,7 @@ export class UiManager {
       <div style="display:flex;flex-direction:column;align-items:center;padding:20px;height:100%;background:rgba(0,0,0,0.7);overflow-y:auto">
         <h2 style="color:#fff;font-family:cursive;font-size:2em;margin-bottom:20px">Choose a Track!</h2>
         <div class="card-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:15px;max-width:900px">${trackCards}</div>
-        <div class="nav-btns" style="margin-top:30px">
+        <div style="display:flex;gap:12px;margin-top:30px">
           <button class="menu-btn" data-action="back-to-menu" style="background:#eee;color:#999">← Back</button>
           <button class="menu-btn" data-action="next-to-character">Next →</button>
         </div>
@@ -134,7 +134,7 @@ export class UiManager {
       <div style="display:flex;flex-direction:column;align-items:center;padding:20px;height:100%;background:rgba(0,0,0,0.7);overflow-y:auto">
         <h2 style="color:#fff;font-family:cursive;font-size:2em;margin-bottom:20px">Choose Your Racer!</h2>
         <div class="card-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:800px">${charCards}</div>
-        <div class="nav-btns" style="margin-top:30px">
+        <div style="display:flex;gap:12px;margin-top:30px">
           <button class="menu-btn" data-action="back-to-tracks" style="background:#eee;color:#999">← Back</button>
           <button class="menu-btn" data-action="next-to-settings">Next →</button>
         </div>
@@ -181,8 +181,10 @@ export class UiManager {
           </label>
         </div>
 
-        <button class="menu-btn" data-action="back-to-characters" style="background:#eee;color:#999;font-size:1em">← Back</button>
-        <button class="menu-btn" data-action="start-race" style="font-size:2em;background:#ff69b4;color:#fff">🏁 START RACE!</button>
+        <div style="display:flex;gap:12px;align-items:center">
+          <button class="menu-btn" data-action="back-to-characters" style="background:#eee;color:#999;font-size:1em">← Back</button>
+          <button class="menu-btn" data-action="start-race" style="font-size:2em;background:#ff69b4;color:#fff">🏁 START RACE!</button>
+        </div>
       </div>
       <style>
         .diff-btn {
