@@ -12,12 +12,19 @@ export interface TrackZone {
   type: 'drift' | 'item';
 }
 
+export interface SceneryZone {
+  start: number;
+  end: number;
+  type: 'forest';
+}
+
 export interface TrackDef {
   id: string;
   name: string;
   description: string;
   controlPoints: TrackControlPoint[];
   zones: TrackZone[];
+  sceneryZones?: SceneryZone[];
   available: boolean;
 }
 
@@ -62,6 +69,10 @@ function rainbowMeadow(): TrackDef {
       { start: 0.02, end: 0.15, type: 'item' },
       { start: 0.32, end: 0.45, type: 'item' },
       { start: 0.77, end: 0.90, type: 'item' },
+    ],
+    sceneryZones: [
+      // Dense forest after the drift zone, before the wide finish approach
+      { start: 0.72, end: 0.88, type: 'forest' },
     ],
     available: true,
   };

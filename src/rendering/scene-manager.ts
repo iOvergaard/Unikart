@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import { Kart } from '../physics/kart';
 import { Track } from '../track/track';
-import { createCharacterModel, createItemBox, createButterflyMesh } from './voxel-models';
+import {
+  createCharacterModel, createItemBox, createButterflyMesh,
+  createRainbowArch, createMeadowTree, createPineTree, createHill, createFlowerPatch,
+} from './voxel-models';
 import { ButterflyInstance } from '../gameplay/butterfly-system';
 import { ItemBox } from '../gameplay/item-system';
 import { CAMERA_DISTANCE, CAMERA_HEIGHT, CAMERA_LERP } from '../config/constants';
@@ -406,64 +409,124 @@ export class SceneManager {
   }
 
   private addScenery(track: Track): void {
-    // Scatter some "flowers" (small coloured boxes) around the track
-    const flowerColors = [0xff69b4, 0xff6347, 0xffd700, 0xda70d6, 0x87ceeb, 0x90ee90];
+    const add = (obj: THREE.Object3D) => {
+      this.scene.add(obj);
+      this.raceObjects.push(obj);
+    };
 
-    for (let i = 0; i < 80; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 30 + Math.random() * 150;
-      const x = Math.cos(angle) * dist;
-      const z = Math.sin(angle) * dist;
+    // Helper: get a world position offset from the spline
+    const getOffsetPos = (t: number, lateralDist: number): THREE.Vector3 => {
+      const center = track.spline.getPoint(t);
+      const right = track.spline.getRight(t);
+      return center.clone().add(right.clone().multiplyScalar(lateralDist));
+    };
 
-      // Skip if too close to road
-      const testPos = new THREE.Vector3(x, 0, z);
-      if (track.isOnRoad(testPos)) continue;
+    // Helper: check if t falls inside a scenery zone of a given type
+    const isInSceneryZone = (t: number, type: string): boolean =>
+      track.sceneryZones.some(z => z.type === type && t >= z.start && t <= z.end);
 
-      // Flower stem
-      const stemGeo = new THREE.BoxGeometry(0.2, 1, 0.2);
-      const stemMat = new THREE.MeshLambertMaterial({ color: 0x228b22 });
-      const stem = new THREE.Mesh(stemGeo, stemMat);
-      stem.position.set(x, 0.5, z);
-      this.scene.add(stem);
-      this.raceObjects.push(stem);
-
-      // Flower head
-      const flowerGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
-      const flowerMat = new THREE.MeshLambertMaterial({
-        color: flowerColors[Math.floor(Math.random() * flowerColors.length)],
-      });
-      const flower = new THREE.Mesh(flowerGeo, flowerMat);
-      flower.position.set(x, 1.2, z);
-      flower.rotation.y = Math.random() * Math.PI;
-      this.scene.add(flower);
-      this.raceObjects.push(flower);
+    // ── Rainbow arches (3-4 at scenic points) ──
+    const rainbowTs = [0.05, 0.35, 0.6, 0.85];
+    for (const t of rainbowTs) {
+      const arch = createRainbowArch();
+      const pos = getOffsetPos(t, (Math.random() > 0.5 ? 1 : -1) * (12 + Math.random() * 5));
+      arch.position.copy(pos);
+      // Orient arch perpendicular to road
+      const tangent = track.spline.getTangent(t);
+      arch.rotation.y = Math.atan2(tangent.x, tangent.z);
+      add(arch);
     }
 
-    // A few "trees" (stacked boxes)
-    for (let i = 0; i < 20; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 50 + Math.random() * 120;
-      const x = Math.cos(angle) * dist;
-      const z = Math.sin(angle) * dist;
+    // ── Meadow trees (40-50 along both sides of track, skip forest zones) ──
+    const treeCount = 45;
+    for (let i = 0; i < treeCount; i++) {
+      const t = i / treeCount + (Math.random() - 0.5) * 0.02;
+      if (isInSceneryZone(t, 'forest')) continue;
 
-      const testPos = new THREE.Vector3(x, 0, z);
-      if (track.isOnRoad(testPos)) continue;
+      const side = i % 2 === 0 ? 1 : -1;
+      // 14-25 units from center (past road edge + 3 unit buffer)
+      const lateralDist = side * (14 + Math.random() * 12);
+      const pos = getOffsetPos(t, lateralDist);
 
-      // Trunk
-      const trunkGeo = new THREE.BoxGeometry(1, 4, 1);
-      const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
-      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-      trunk.position.set(x, 2, z);
-      this.scene.add(trunk);
-      this.raceObjects.push(trunk);
+      if (track.isOnRoad(pos)) continue;
 
-      // Canopy
-      const canopyGeo = new THREE.BoxGeometry(3, 3, 3);
-      const canopyMat = new THREE.MeshLambertMaterial({ color: 0x228b22 });
-      const canopy = new THREE.Mesh(canopyGeo, canopyMat);
-      canopy.position.set(x, 5, z);
-      this.scene.add(canopy);
-      this.raceObjects.push(canopy);
+      const tree = createMeadowTree();
+      tree.position.copy(pos);
+      const scale = 0.7 + Math.random() * 0.6;
+      tree.scale.setScalar(scale);
+      tree.rotation.y = Math.random() * Math.PI * 2;
+      add(tree);
+    }
+
+    // ── Hills (8-12 in the background) ──
+    const hillCount = 10;
+    for (let i = 0; i < hillCount; i++) {
+      const t = i / hillCount + (Math.random() - 0.5) * 0.05;
+      const side = i % 2 === 0 ? 1 : -1;
+      // 40-80 units from center for background depth
+      const lateralDist = side * (45 + Math.random() * 40);
+      const pos = getOffsetPos(t, lateralDist);
+
+      const hill = createHill();
+      hill.position.copy(pos);
+      hill.position.y = -0.05; // sit on ground plane
+      const scale = 0.6 + Math.random() * 0.8;
+      hill.scale.set(scale, scale * (0.5 + Math.random() * 0.5), scale);
+      add(hill);
+    }
+
+    // ── Flower patches (skip forest zones) ──
+    const patchCount = 30;
+    for (let i = 0; i < patchCount; i++) {
+      const t = Math.random();
+      if (isInSceneryZone(t, 'forest')) continue;
+
+      const side = Math.random() > 0.5 ? 1 : -1;
+      // 12-20 units from center, just past road edge
+      const lateralDist = side * (12 + Math.random() * 8);
+      const pos = getOffsetPos(t, lateralDist);
+
+      if (track.isOnRoad(pos)) continue;
+
+      const patch = createFlowerPatch();
+      patch.position.copy(pos);
+      add(patch);
+    }
+
+    // ── Forest zones — dense tree placement ──
+    for (const zone of track.sceneryZones.filter(z => z.type === 'forest')) {
+      const forestTreeCount = 30;
+      for (let i = 0; i < forestTreeCount; i++) {
+        const t = zone.start + (i / forestTreeCount) * (zone.end - zone.start);
+
+        for (const side of [-1, 1]) {
+          // Inner row: close to road (10-14 units from center)
+          const innerDist = side * (10 + Math.random() * 4);
+          const innerPos = getOffsetPos(t, innerDist);
+          if (!track.isOnRoad(innerPos)) {
+            const tree = Math.random() < 0.7 ? createPineTree() : createMeadowTree();
+            tree.position.copy(innerPos);
+            const scale = 0.6 + Math.random() * 0.5;
+            tree.scale.setScalar(scale);
+            tree.rotation.y = Math.random() * Math.PI * 2;
+            add(tree);
+          }
+
+          // Outer row: every other position for depth (16-22 units from center)
+          if (i % 2 === 0) {
+            const outerDist = side * (16 + Math.random() * 6);
+            const outerPos = getOffsetPos(t, outerDist);
+            if (!track.isOnRoad(outerPos)) {
+              const tree = Math.random() < 0.7 ? createPineTree() : createMeadowTree();
+              tree.position.copy(outerPos);
+              const scale = 0.7 + Math.random() * 0.4;
+              tree.scale.setScalar(scale);
+              tree.rotation.y = Math.random() * Math.PI * 2;
+              add(tree);
+            }
+          }
+        }
+      }
     }
   }
 }

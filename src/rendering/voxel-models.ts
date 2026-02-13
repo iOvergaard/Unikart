@@ -104,36 +104,158 @@ function kartBody(bodyColor: number): Voxel[] {
   return voxels;
 }
 
-/** Add a unicorn rider with horn and mane */
-function unicornRider(hornColor: number, maneColor: number): Voxel[] {
-  const voxels: Voxel[] = [];
-  const head = 0xffd5b4;
+/** Build a smooth-geometry unicorn rider (spheres, cylinders, cones) */
+function buildUnicornRider(hornColor: number, maneColor: number): THREE.Group {
+  const group = new THREE.Group();
 
-  // Head
-  voxels.push({ x: 0, y: 4, z: -1, color: head });
-  // Horn (2-high, tapered)
-  voxels.push({ x: 0, y: 5, z: -1, color: hornColor });
-  voxels.push({ x: 0, y: 6, z: -1, color: hornColor });
-  // Mane (flows down both sides + back)
-  voxels.push({ x: -1, y: 5, z: -1, color: maneColor });
-  voxels.push({ x: 1, y: 5, z: -1, color: maneColor });
-  voxels.push({ x: -1, y: 4, z: -1, color: maneColor });
-  voxels.push({ x: 1, y: 4, z: -1, color: maneColor });
-  voxels.push({ x: 0, y: 4, z: -2, color: maneColor }); // back of mane
+  // Shared materials
+  const whiteMat = new THREE.MeshLambertMaterial({ color: 0xf5f5f5 });
+  const hoofMat = new THREE.MeshLambertMaterial({ color: 0x555555 });
+  const eyeMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
+  const eyeHighlightMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const snoutMat = new THREE.MeshLambertMaterial({ color: 0xffcccc });
+  const hornMat = new THREE.MeshLambertMaterial({ color: hornColor });
+  const maneMat = new THREE.MeshLambertMaterial({ color: maneColor });
 
-  return voxels;
+  // ── Body (main torso — slightly elongated sphere) ──
+  const bodyGeo = new THREE.SphereGeometry(0.45, 12, 10);
+  const body = new THREE.Mesh(bodyGeo, whiteMat);
+  body.scale.set(1, 0.85, 1.25);
+  body.position.set(0, 1.0, 0.1);
+  group.add(body);
+
+  // Rump (behind torso)
+  const rumpGeo = new THREE.SphereGeometry(0.38, 10, 8);
+  const rump = new THREE.Mesh(rumpGeo, whiteMat);
+  rump.position.set(0, 0.9, -0.4);
+  group.add(rump);
+
+  // ── Legs ──
+  const legGeo = new THREE.CylinderGeometry(0.08, 0.07, 0.5, 6);
+  const hoofGeo = new THREE.SphereGeometry(0.07, 6, 4);
+
+  // Front legs (angled slightly forward)
+  for (const side of [-1, 1]) {
+    const fl = new THREE.Mesh(legGeo, whiteMat);
+    fl.position.set(side * 0.22, 0.58, 0.4);
+    fl.rotation.x = 0.25;
+    group.add(fl);
+  }
+  // Back legs (angled slightly back)
+  for (const side of [-1, 1]) {
+    const bl = new THREE.Mesh(legGeo, whiteMat);
+    bl.position.set(side * 0.2, 0.52, -0.6);
+    bl.rotation.x = -0.2;
+    group.add(bl);
+  }
+
+  // Hooves
+  const hoofPositions = [
+    { x: -0.22, y: 0.3, z: 0.47 },
+    { x: 0.22, y: 0.3, z: 0.47 },
+    { x: -0.2, y: 0.3, z: -0.65 },
+    { x: 0.2, y: 0.3, z: -0.65 },
+  ];
+  for (const p of hoofPositions) {
+    const hoof = new THREE.Mesh(hoofGeo, hoofMat);
+    hoof.position.set(p.x, p.y, p.z);
+    group.add(hoof);
+  }
+
+  // ── Neck (cylinder tilted forward ~40°) ──
+  const neckGeo = new THREE.CylinderGeometry(0.14, 0.18, 0.6, 8);
+  const neck = new THREE.Mesh(neckGeo, whiteMat);
+  neck.position.set(0, 1.38, 0.35);
+  neck.rotation.x = -0.7;
+  group.add(neck);
+
+  // ── Head (slightly elongated on z for a horse-like shape) ──
+  const headGeo = new THREE.SphereGeometry(0.28, 10, 8);
+  const head = new THREE.Mesh(headGeo, whiteMat);
+  head.scale.set(1, 1, 1.3);
+  head.position.set(0, 1.72, 0.6);
+  group.add(head);
+
+  // Snout (soft pink)
+  const snoutGeo = new THREE.SphereGeometry(0.13, 8, 6);
+  const snout = new THREE.Mesh(snoutGeo, snoutMat);
+  snout.position.set(0, 1.66, 0.9);
+  group.add(snout);
+
+  // ── Eyes ──
+  const eyeGeo = new THREE.SphereGeometry(0.055, 6, 4);
+  const highlightGeo = new THREE.SphereGeometry(0.02, 4, 3);
+  for (const side of [-1, 1]) {
+    const eye = new THREE.Mesh(eyeGeo, eyeMat);
+    eye.position.set(side * 0.18, 1.79, 0.78);
+    group.add(eye);
+    const hl = new THREE.Mesh(highlightGeo, eyeHighlightMat);
+    hl.position.set(side * 0.2, 1.81, 0.8);
+    group.add(hl);
+  }
+
+  // ── Ears (small cones, angled outward) ──
+  const earGeo = new THREE.ConeGeometry(0.07, 0.18, 6);
+  for (const side of [-1, 1]) {
+    const ear = new THREE.Mesh(earGeo, whiteMat);
+    ear.position.set(side * 0.15, 1.98, 0.55);
+    ear.rotation.z = side * 0.3;
+    group.add(ear);
+  }
+
+  // ── Horn (cone from forehead, tilted up-forward) ──
+  const hornGeo = new THREE.ConeGeometry(0.06, 0.5, 8);
+  const horn = new THREE.Mesh(hornGeo, hornMat);
+  horn.position.set(0, 2.12, 0.68);
+  horn.rotation.x = -0.4;
+  group.add(horn);
+
+  // ── Mane (flattened spheres from head down along neck) ──
+  const maneGeo = new THREE.SphereGeometry(0.12, 6, 4);
+  const manePoints = [
+    { y: 1.92, z: 0.45, sx: 1.4, sy: 0.7, sz: 1.0 },
+    { y: 1.82, z: 0.35, sx: 1.3, sy: 0.7, sz: 1.1 },
+    { y: 1.68, z: 0.25, sx: 1.3, sy: 0.8, sz: 1.0 },
+    { y: 1.52, z: 0.18, sx: 1.2, sy: 0.7, sz: 1.0 },
+    { y: 1.38, z: 0.12, sx: 1.1, sy: 0.7, sz: 1.0 },
+    { y: 1.22, z: 0.08, sx: 1.0, sy: 0.6, sz: 1.0 },
+  ];
+  for (const mp of manePoints) {
+    const m = new THREE.Mesh(maneGeo, maneMat);
+    m.position.set(0, mp.y, mp.z);
+    m.scale.set(mp.sx, mp.sy, mp.sz);
+    group.add(m);
+  }
+
+  // ── Tail (spheres arcing backward from rump) ──
+  const tailGeo = new THREE.SphereGeometry(0.1, 6, 4);
+  const tailPoints = [
+    { x: 0, y: 0.98, z: -0.7, sx: 1.0, sy: 1.0, sz: 1.0 },
+    { x: 0, y: 1.08, z: -0.9, sx: 1.1, sy: 0.8, sz: 1.0 },
+    { x: 0, y: 1.12, z: -1.1, sx: 1.2, sy: 0.8, sz: 1.0 },
+    { x: 0.05, y: 1.08, z: -1.28, sx: 1.3, sy: 0.9, sz: 1.0 },
+    { x: -0.05, y: 0.98, z: -1.42, sx: 1.4, sy: 1.0, sz: 1.0 },
+  ];
+  for (const tp of tailPoints) {
+    const t = new THREE.Mesh(tailGeo, maneMat);
+    t.position.set(tp.x, tp.y, tp.z);
+    t.scale.set(tp.sx, tp.sy, tp.sz);
+    group.add(t);
+  }
+
+  return group;
 }
 
 /** Create the complete 3D model for a character */
 export function createCharacterModel(char: CharacterDef): THREE.Object3D {
-  const body = kartBody(char.color);
-  const rider = unicornRider(char.hornColor, char.maneColor);
+  const kartMesh = buildVoxelMesh(kartBody(char.color));
+  kartMesh.castShadow = true;
 
-  const mesh = buildVoxelMesh([...body, ...rider]);
-  mesh.castShadow = true;
+  const rider = buildUnicornRider(char.hornColor, char.maneColor);
 
   const group = new THREE.Group();
-  group.add(mesh);
+  group.add(kartMesh);
+  group.add(rider);
   return group;
 }
 
@@ -226,5 +348,164 @@ export function createItemBox(): THREE.Group {
   group.add(labelBack);
 
   group.position.y = 1.8;
+  return group;
+}
+
+// ── Scenery models ──
+
+const RAINBOW_COLORS = [0xff0000, 0xff8800, 0xffff00, 0x00cc00, 0x0088ff, 0x4400ff, 0x8800cc];
+
+/** Create a rainbow arch made of 7 coloured box segments */
+export function createRainbowArch(): THREE.Group {
+  const group = new THREE.Group();
+  const archHeight = 15;
+  const archSpan = 22;
+  const bandThickness = 0.8;
+  const bandDepth = 1.2;
+  const segments = 16;
+
+  for (let band = 0; band < 7; band++) {
+    const radius = archSpan / 2 - band * bandThickness * 0.8;
+    const mat = new THREE.MeshLambertMaterial({
+      color: RAINBOW_COLORS[band],
+      transparent: true,
+      opacity: 0.8,
+    });
+
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI;
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius * (archHeight / (archSpan / 2));
+      const geo = new THREE.BoxGeometry(bandThickness, bandThickness, bandDepth);
+      const seg = new THREE.Mesh(geo, mat);
+      seg.position.set(x, y, 0);
+      group.add(seg);
+    }
+  }
+  return group;
+}
+
+/** Create an improved meadow tree with trunk + round canopy */
+export function createMeadowTree(): THREE.Group {
+  const group = new THREE.Group();
+
+  // Trunk
+  const trunkH = 3 + Math.random() * 2;
+  const trunkGeo = new THREE.BoxGeometry(1.2, trunkH, 1.2);
+  const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.y = trunkH / 2;
+  group.add(trunk);
+
+  // Main canopy (large cube)
+  const canopySize = 3.5 + Math.random() * 1.5;
+  const canopyGeo = new THREE.BoxGeometry(canopySize, canopySize, canopySize);
+  const green = 0x228b22 + Math.floor(Math.random() * 0x002200);
+  const canopyMat = new THREE.MeshLambertMaterial({ color: green });
+  const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+  canopy.position.y = trunkH + canopySize / 2 - 0.5;
+  canopy.rotation.y = Math.random() * Math.PI / 4;
+  group.add(canopy);
+
+  // Top cap (smaller cube on top for rounder look)
+  const capSize = canopySize * 0.65;
+  const capGeo = new THREE.BoxGeometry(capSize, capSize, capSize);
+  const cap = new THREE.Mesh(capGeo, canopyMat);
+  cap.position.y = trunkH + canopySize + capSize / 2 - 1.2;
+  cap.rotation.y = Math.PI / 4;
+  group.add(cap);
+
+  return group;
+}
+
+/** Create a pine tree — taller trunk + 3 stacked shrinking canopy tiers */
+export function createPineTree(): THREE.Group {
+  const group = new THREE.Group();
+
+  // Trunk — taller and darker than meadow tree
+  const trunkH = 5 + Math.random() * 2;
+  const trunkGeo = new THREE.BoxGeometry(1.0, trunkH, 1.0);
+  const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5c3317 });
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.y = trunkH / 2;
+  group.add(trunk);
+
+  // 3 canopy tiers — shrinking cubes stacked upward
+  const tierSizes = [4.5, 3.2, 2.0];
+  const tierHeights = [3.0, 2.5, 2.0];
+  let y = trunkH - 1; // overlap with top of trunk
+  for (let i = 0; i < 3; i++) {
+    const size = tierSizes[i];
+    const h = tierHeights[i];
+    const green = i === 0 ? 0x1a5c1a : i === 1 ? 0x1e6b1e : 0x227a22;
+    const geo = new THREE.BoxGeometry(size, h, size);
+    const mat = new THREE.MeshLambertMaterial({ color: green });
+    const tier = new THREE.Mesh(geo, mat);
+    tier.position.y = y + h / 2;
+    tier.rotation.y = Math.random() * Math.PI / 4;
+    group.add(tier);
+    y += h - 0.4; // slight overlap between tiers
+  }
+
+  return group;
+}
+
+/** Create a gentle rolling hill (flattened ellipsoid shape using stacked boxes) */
+export function createHill(): THREE.Group {
+  const group = new THREE.Group();
+  const height = 5 + Math.random() * 4;
+  const radiusX = 15 + Math.random() * 15;
+  const radiusZ = 12 + Math.random() * 12;
+  const layers = 5;
+  const green = 0x6db84a;
+
+  const mat = new THREE.MeshLambertMaterial({ color: green });
+
+  for (let i = 0; i < layers; i++) {
+    const frac = i / layers;
+    const y = frac * height;
+    const scale = Math.cos(frac * Math.PI / 2); // cosine falloff for dome shape
+    const sx = radiusX * 2 * scale;
+    const sz = radiusZ * 2 * scale;
+    const layerH = height / layers + 0.2; // slight overlap
+    const geo = new THREE.BoxGeometry(sx, layerH, sz);
+    const layer = new THREE.Mesh(geo, mat);
+    layer.position.y = y + layerH / 2;
+    group.add(layer);
+  }
+
+  return group;
+}
+
+/** Create a cluster of 3-5 flowers grouped together */
+export function createFlowerPatch(): THREE.Group {
+  const group = new THREE.Group();
+  const flowerColors = [0xff69b4, 0xff6347, 0xffd700, 0xda70d6, 0x87ceeb, 0x90ee90];
+  const count = 3 + Math.floor(Math.random() * 3);
+
+  for (let i = 0; i < count; i++) {
+    const ox = (Math.random() - 0.5) * 2.5;
+    const oz = (Math.random() - 0.5) * 2.5;
+    const stemH = 0.6 + Math.random() * 0.6;
+
+    // Stem
+    const stemGeo = new THREE.BoxGeometry(0.15, stemH, 0.15);
+    const stemMat = new THREE.MeshLambertMaterial({ color: 0x228b22 });
+    const stem = new THREE.Mesh(stemGeo, stemMat);
+    stem.position.set(ox, stemH / 2, oz);
+    group.add(stem);
+
+    // Flower head
+    const headSize = 0.5 + Math.random() * 0.3;
+    const headGeo = new THREE.BoxGeometry(headSize, headSize, headSize);
+    const headMat = new THREE.MeshLambertMaterial({
+      color: flowerColors[Math.floor(Math.random() * flowerColors.length)],
+    });
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.set(ox, stemH + headSize / 2, oz);
+    head.rotation.y = Math.random() * Math.PI;
+    group.add(head);
+  }
+
   return group;
 }

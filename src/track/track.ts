@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { TrackSpline } from './spline';
-import { TrackDef, TrackZone } from '../config/tracks';
+import { TrackDef, TrackZone, SceneryZone } from '../config/tracks';
 import { ROAD_SEGMENTS, ROAD_WIDTH } from '../config/constants';
 
 export class Track {
@@ -31,6 +31,8 @@ export class Track {
     this.groundMesh = this.buildGroundMesh();
     this.barrierMeshes = this.buildBarriers();
   }
+
+  get sceneryZones(): SceneryZone[] { return this.def.sceneryZones ?? []; }
 
   /** Check if a world position is on the road surface */
   isOnRoad(pos: THREE.Vector3): boolean {
@@ -73,43 +75,62 @@ export class Track {
 
   private buildRoadMesh(): THREE.Mesh {
     const segs = ROAD_SEGMENTS;
+    const strips = 7; // 7 rainbow bands across the road
     const vertices: number[] = [];
     const indices: number[] = [];
     const uvs: number[] = [];
     const colors: number[] = [];
+
+    // 7 rainbow hues (red → violet)
+    const rainbowHues = [0 / 360, 30 / 360, 60 / 360, 120 / 360, 210 / 360, 260 / 360, 300 / 360];
 
     for (let i = 0; i <= segs; i++) {
       const t = i / segs;
       const center = this.spline.getPoint(t);
       const right = this.spline.getRight(t);
       const width = this.getWidthAtT(t);
-
-      const left = center.clone().add(right.clone().multiplyScalar(-width / 2));
-      const rght = center.clone().add(right.clone().multiplyScalar(width / 2));
-
-      vertices.push(left.x, left.y + 0.01, left.z);
-      vertices.push(rght.x, rght.y + 0.01, rght.z);
-
-      uvs.push(0, t * 10);
-      uvs.push(1, t * 10);
-
-      // Road colour — slight variation for visual interest
       const isInDriftZone = this.zones.some(
         z => z.type === 'drift' && t >= z.start && t <= z.end
       );
-      if (isInDriftZone) {
-        colors.push(0.9, 0.7, 1.0); // Purple tint for drift zones
-        colors.push(0.9, 0.7, 1.0);
-      } else {
-        const shade = 0.55 + Math.sin(t * Math.PI * 8) * 0.05;
-        colors.push(shade, shade, shade + 0.05);
-        colors.push(shade, shade, shade + 0.05);
+
+      // Create strips+1 vertices across the width
+      for (let s = 0; s <= strips; s++) {
+        const frac = s / strips; // 0 = left edge, 1 = right edge
+        const offset = (frac - 0.5) * width;
+        const pos = center.clone().add(right.clone().multiplyScalar(offset));
+
+        vertices.push(pos.x, pos.y + 0.01, pos.z);
+        uvs.push(frac, t * 10);
+
+        // Color: blend between the two nearest rainbow bands
+        const bandPos = frac * (strips - 1);
+        const bandIdx = Math.min(Math.floor(bandPos), strips - 2);
+        const bandFrac = bandPos - bandIdx;
+        const hue0 = rainbowHues[bandIdx];
+        const hue1 = rainbowHues[bandIdx + 1];
+        const hue = hue0 + (hue1 - hue0) * bandFrac;
+
+        const c = new THREE.Color();
+        if (isInDriftZone) {
+          c.setHSL(hue, 0.8, 0.75);
+        } else {
+          c.setHSL(hue, 0.6, 0.6);
+        }
+        colors.push(c.r, c.g, c.b);
       }
 
+      // Build quads between this row and the next
       if (i < segs) {
-        const base = i * 2;
-        indices.push(base, base + 1, base + 2);
-        indices.push(base + 1, base + 3, base + 2);
+        const vertsPerRow = strips + 1;
+        const rowBase = i * vertsPerRow;
+        for (let s = 0; s < strips; s++) {
+          const bl = rowBase + s;
+          const br = rowBase + s + 1;
+          const tl = bl + vertsPerRow;
+          const tr = br + vertsPerRow;
+          indices.push(bl, br, tl);
+          indices.push(br, tr, tl);
+        }
       }
     }
 
