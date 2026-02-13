@@ -31,9 +31,13 @@ export class AudioManager {
   private sfxBus: Tone.Gain;
   private engineBus: Tone.Gain;
 
-  // ── Engine (oscillator — needs continuous pitch tracking) ──
-  private engineOsc: Tone.Oscillator;
+  // ── Engine (layered oscillators for richer sound) ──
+  private engineOsc: Tone.Oscillator;       // fundamental sawtooth
+  private engineOscHigh: Tone.Oscillator;   // octave-up square for "bite"
+  private engineOscSub: Tone.Oscillator;    // sub-octave triangle for body
   private engineFilter: Tone.Filter;
+  private engineLfo: Tone.LFO;             // amplitude modulation for "putt-putt" idle
+  private engineLfoGain: Tone.Gain;         // LFO target
   private engineRunning = false;
 
   // ── Drift charge (oscillator — needs continuous pitch stepping) ──
@@ -61,9 +65,17 @@ export class AudioManager {
     this.sfxBus = new Tone.Gain(0.8).connect(this.masterGain);
     this.engineBus = new Tone.Gain(0.15).connect(this.masterGain);
 
-    // ── Engine oscillator (sawtooth + low-pass) ──
-    this.engineFilter = new Tone.Filter(300, 'lowpass').connect(this.engineBus);
+    // ── Engine: LFO-modulated amplitude for idle "putt-putt" ──
+    this.engineLfoGain = new Tone.Gain(1).connect(this.engineBus);
+    this.engineLfo = new Tone.LFO(8, 0.3, 1).connect(this.engineLfoGain.gain);
+
+    // ── Engine: layered oscillators → shared filter → LFO gain → bus ──
+    this.engineFilter = new Tone.Filter(300, 'lowpass', -24).connect(this.engineLfoGain);
     this.engineOsc = new Tone.Oscillator(ENGINE_BASE_FREQ, 'sawtooth').connect(this.engineFilter);
+    this.engineOscHigh = new Tone.Oscillator(ENGINE_BASE_FREQ * 2, 'square').connect(this.engineFilter);
+    this.engineOscHigh.volume.value = -14; // quieter harmonic layer
+    this.engineOscSub = new Tone.Oscillator(ENGINE_BASE_FREQ * 0.5, 'triangle').connect(this.engineFilter);
+    this.engineOscSub.volume.value = -8;  // warm sub-octave body
 
     // ── Drift charge (square wave, starts silent) ──
     this.driftGain = new Tone.Gain(0).connect(this.sfxBus);
@@ -86,16 +98,25 @@ export class AudioManager {
   update(_dt: number, humanKart: Kart, race: RaceManager): void {
     if (!this.started) return;
 
-    // ── Engine pitch + volume ──
+    // ── Engine pitch + volume + LFO ──
     if (this.engineRunning) {
       const speedRatio = Math.min(Math.abs(humanKart.speed) / (humanKart.baseMaxSpeed || BASE_MAX_SPEED), 1);
-      const freq = ENGINE_BASE_FREQ + (ENGINE_MAX_FREQ - ENGINE_BASE_FREQ) * speedRatio;
+      // Slight curve so low speeds feel more "idle-ish"
+      const curve = speedRatio * speedRatio * 0.4 + speedRatio * 0.6;
+      const freq = ENGINE_BASE_FREQ + (ENGINE_MAX_FREQ - ENGINE_BASE_FREQ) * curve;
       this.engineOsc.frequency.value = freq;
-      this.engineFilter.frequency.value = 200 + 600 * speedRatio;
-      // Taper engine volume: rises to mid-speed then eases down at top speed
+      this.engineOscHigh.frequency.value = freq * 2;
+      this.engineOscSub.frequency.value = freq * 0.5;
+      // Filter opens up with speed
+      this.engineFilter.frequency.value = 180 + 900 * curve;
+      // LFO: slow chug at idle (6 Hz), fast at speed (20 Hz), less depth at speed
+      this.engineLfo.frequency.value = 6 + 14 * speedRatio;
+      this.engineLfo.min = 0.3 + 0.6 * speedRatio; // at full speed min→0.9 (almost no wobble)
+      this.engineLfo.max = 1;
+      // Volume: rises to mid-speed then eases at top speed
       const vol = speedRatio < 0.6
         ? 0.1 + 0.9 * (speedRatio / 0.6)
-        : 1.0 - 0.4 * ((speedRatio - 0.6) / 0.4);
+        : 1.0 - 0.3 * ((speedRatio - 0.6) / 0.4);
       this.engineBus.gain.value = 0.15 * vol;
     }
 
@@ -201,6 +222,9 @@ export class AudioManager {
     this.resetPrevState();
     if (!this.engineRunning) {
       this.engineOsc.start();
+      this.engineOscHigh.start();
+      this.engineOscSub.start();
+      this.engineLfo.start();
       this.engineRunning = true;
     }
   }
@@ -209,6 +233,9 @@ export class AudioManager {
   stopRace(): void {
     if (this.engineRunning) {
       this.engineOsc.stop();
+      this.engineOscHigh.stop();
+      this.engineOscSub.stop();
+      this.engineLfo.stop();
       this.engineRunning = false;
     }
     this.stopDriftCharge();
