@@ -50,7 +50,7 @@ export class UiManager {
     this.overlay.innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:linear-gradient(135deg,#ff69b4,#87ceeb,#da70d6)">
         <h1 style="font-size:4em;color:#fff;text-shadow:3px 3px 0 #c060a0;margin-bottom:10px;font-family:cursive">
-          ✨ Voxel Kart ✨
+          ✨ Unikart ✨
         </h1>
         <p style="font-size:1.5em;color:#fff;margin-bottom:40px;font-family:cursive">Unicorns Collect Butterflies!</p>
         <button class="menu-btn" data-action="play">🏁 Play!</button>

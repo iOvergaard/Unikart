@@ -1,7 +1,7 @@
 {
-  "name": "voxel-kart",
+  "name": "unikart",
   "version": "0.1.0",
-  "description": "A butterfly-and-unicorn themed 3D voxel kart racer",
+  "description": "Unikart — unicorn kart racing with butterfly collecting",
   "type": "module",
   "scripts": {
     "dev": "vite",
