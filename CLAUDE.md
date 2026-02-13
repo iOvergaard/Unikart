@@ -46,7 +46,7 @@ src/ui/                        ← DOM-based menus + HUD (ui-manager.ts)
 
 **Collision** (`physics/collision.ts`): Kart↔barrier (gentle push-back, never stop dead) and kart↔kart (weight-based separation, gentle bumps). Called once per physics frame.
 
-**Items** (`gameplay/item-system.ts`): 3 items with position-weighted rolls. Gust = 0.6s steering lock, Wobble = 1.2s at 50% speed, Turbo = 1.5s self-boost. One-item capacity.
+**Items** (`gameplay/item-system.ts`): 3 items with position-weighted rolls. Gust = 0.6s steering lock, Wobble = 1.2s at 50% speed, Turbo = 1.5s self-boost. One-item capacity. Individual item boxes with proximity pickup (radius 3), disappear on pickup and respawn after 5s. Rainbow gift-box meshes with "?" label. Toast messages on item use ("⚡ TURBO!", "💨 Gust hit X!").
 
 **Voxel Models** (`rendering/voxel-models.ts`): Characters built from arrays of `{x,y,z,color}` voxels. Merged into single `BufferGeometry` per character (one draw call). Kart body + unicorn rider (horn + mane with per-character colours). Also builds butterfly collectible meshes.
 
@@ -61,12 +61,12 @@ src/ui/                        ← DOM-based menus + HUD (ui-manager.ts)
    b. AI karts: aiController.update() → simulated inputs → updatePhysics()
    c. resolveCollisions(karts, track)
    d. Update race progress (spline parameter → lap detection)
-   e. Item pickups (zone check → weighted roll)
+   e. Item pickups (proximity to item boxes → weighted roll, box respawn timer)
    f. Butterfly collection (proximity check → kart.butterflies++)
-3. scene: add/remove butterfly meshes, animate butterflies
+3. scene: sync item box visibility, add/remove butterfly meshes, animate both
 4. scene.updateFrame(karts, humanKart, dt) — sync meshes, camera, particles
-4. scene.render()                    — Three.js draw call
-5. ui.show(screen, state, hudData)   — update HUD numbers (or rebuild if screen changed)
+5. scene.render()                    — Three.js draw call
+6. ui.show(screen, state, hudData)   — update HUD numbers, toasts (or rebuild if screen changed)
 ```
 
 ## The 8 Unicorns
@@ -120,7 +120,7 @@ Butterflies are the main collectible. They spawn as clusters of 4 along the road
 
 ## Track: Rainbow Meadow
 
-12 control points forming a closed Catmull-Rom spline. ~1.2km loop. 4 sections: flower straightaway → right curve → back straight → left sweeper (drift zone) → castle hill → wide finish approach. Road width 18-22 units. Rainbow-coloured barriers. Drift zone from t=0.5 to t=0.7. Item zones at t≈0.08, 0.38, 0.83.
+12 control points forming a closed Catmull-Rom spline. ~1.2km loop. 4 sections: flower straightaway → right curve → back straight → left sweeper (drift zone) → castle hill → wide finish approach. Road width 18-22 units. Rainbow-coloured barriers. Drift zone from t=0.5 to t=0.7. Item zones at t≈0.08, 0.38, 0.83. Chequered start/finish line at t=0 with pink banner arch. Starting grid at t=0.02 with 8 numbered boxes (2-wide, 4 rows).
 
 ## Controls
 
@@ -137,8 +137,6 @@ Butterflies are the main collectible. They spawn as clusters of 4 along the road
 
 ### Bugs to Fix
 - **Menu re-selection**: `select-track` and `select-character` actions call `state.transition()` to re-render, but since the `show()` short-circuit now prevents re-render on same screen, selecting a different track/character won't visually update. Fix: add a `forceRedraw()` method or track selection state separately.
-- **Countdown screen**: rebuilds every frame (intended for countdown timer), but this is slightly wasteful. Could use a targeted DOM update instead.
-- **worldToMinimap**: recomputes bounding box every frame per kart. Should cache the bounds like `computeMinimapPoints` does.
 
 ### Not Yet Implemented (Phase 8: Audio & Polish)
 - **Audio**: No sounds at all currently. Need:
@@ -179,7 +177,7 @@ Butterflies are the main collectible. They spawn as clusters of 4 along the road
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `src/main.ts` | 285 | Entry point, game loop, UI wiring |
+| `src/main.ts` | 295 | Entry point, game loop, UI wiring |
 | `src/config/constants.ts` | 48 | All physics/game tuning values |
 | `src/config/characters.ts` | 103 | 8 unicorn character definitions |
 | `src/config/items.ts` | 67 | 3 item definitions + roll logic |
@@ -192,11 +190,11 @@ Butterflies are the main collectible. They spawn as clusters of 4 along the road
 | `src/physics/collision.ts` | 62 | Collision detection + response |
 | `src/track/spline.ts` | 82 | Catmull-Rom spline utilities |
 | `src/track/track.ts` | 180 | Track class (mesh gen, queries) |
-| `src/rendering/scene-manager.ts` | 340 | Three.js scene, camera, particles, butterflies |
-| `src/rendering/voxel-models.ts` | 191 | Unicorn + butterfly model builder |
+| `src/rendering/scene-manager.ts` | 469 | Three.js scene, camera, particles, butterflies, finish line, grid |
+| `src/rendering/voxel-models.ts` | 230 | Unicorn + butterfly + item box model builder |
 | `src/ai/ai-controller.ts` | 140 | AI driving logic |
 | `src/ai/difficulty.ts` | 42 | Chill/Standard/Mean profiles |
 | `src/gameplay/race-manager.ts` | 206 | Race orchestration |
 | `src/gameplay/butterfly-system.ts` | 101 | Butterfly spawning, collection, scoring |
-| `src/gameplay/item-system.ts` | 80 | Item pickup/usage/effects |
-| `src/ui/ui-manager.ts` | 462 | All UI screens + HUD + butterfly counter |
+| `src/gameplay/item-system.ts` | 141 | Item box pickup/respawn, usage/effects, toast |
+| `src/ui/ui-manager.ts` | 484 | All UI screens + HUD + butterfly counter + toasts |
