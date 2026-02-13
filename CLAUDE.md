@@ -23,7 +23,7 @@ src/track/                     ← Catmull-Rom spline, procedural road mesh, tra
 src/rendering/                 ← Three.js scene, voxel model builder, chase camera
 src/ai/                        ← AI controller, difficulty profiles
 src/gameplay/                  ← Race manager (orchestrator), item system, butterfly system
-src/audio/                     ← Audio manager (Tone.js engine + Kenney CC0 samples)
+src/audio/                     ← Audio manager (native Web Audio API + Kenney CC0 samples)
 src/ui/                        ← DOM-based menus + HUD (ui-manager.ts)
 ```
 
@@ -45,7 +45,7 @@ src/ui/                        ← DOM-based menus + HUD (ui-manager.ts)
 
 **AI** (`ai/ai-controller.ts`): Spline-following with lane offsets. Speed-adaptive look-ahead (4-8% of track). Decides steering, drift timing, item usage every ~0.3-0.7s. Personality from character's `aiTendency` (aggressive, drift-happy, defensive, item-focused, smooth, balanced, pusher). Difficulty from `ai/difficulty.ts` profiles — `accelMult`, `speedMult`, `stunRecovery` all actively applied. Drift timing aligned with actual tier thresholds.
 
-**Collision** (`physics/collision.ts`): Kart↔barrier (gentle push-back, never stop dead) and kart↔kart (weight-based separation, gentle bumps). Called once per physics frame. 2-second grace period at race start — kart-kart collisions disabled to prevent grid pile-ups.
+**Collision** (`physics/collision.ts`): Kart↔barrier (gentle push-back, never stop dead) and kart↔kart (weight-based separation, gentle bumps). Called once per physics frame. 5-second grace period at race start — kart-kart collisions disabled to prevent grid pile-ups.
 
 **Items** (`gameplay/item-system.ts`): 3 items with position-weighted rolls. Gust = 0.6s steering lock, Wobble = 1.2s at 50% speed, Turbo = 1.5s self-boost. One-item capacity. Individual item boxes with proximity pickup (radius 3), disappear on pickup and respawn after 5s. Rainbow gift-box meshes with "?" label. Toast messages on item use ("⚡ TURBO!", "💨 Gust hit X!").
 
@@ -53,7 +53,7 @@ src/ui/                        ← DOM-based menus + HUD (ui-manager.ts)
 
 **Butterfly System** (`gameplay/butterfly-system.ts`): Manages butterfly collectibles on the track. Spawns 9 initial clusters of 4 butterflies each, plus new clusters every 3-5s. Collection radius 3 units — all karts (human + AI) collect. Scoring: position bonus (1st=10..8th=0) + butterfly count = combined score.
 
-**Audio** (`audio/audio-manager.ts`): Hybrid approach — Tone.js oscillators for continuous sounds (engine hum, drift charge) and Kenney CC0 `.mp3` samples for one-shots (UI clicks, item pickup/use, boost, countdown, lap chime, butterfly collect, bump). Polls human kart state each frame to detect changes (no events emitted from other systems). Web Audio unlocks on first UI interaction via `Tone.start()` (awaited properly for mobile). Signal chain: each source → sfx bus or engine bus → master gain → destination. Volume sliders control bus gains.
+**Audio** (`audio/audio-manager.ts`): Pure native Web Audio API (no Tone.js). Single `AudioContext` created on first user interaction. Oscillators (engine hum via layered sawtooth/square/triangle + LFO, drift charge via square wave) and Kenney CC0 `.mp3` samples (fetched + `decodeAudioData`) all share one context for iOS compatibility. Engine nodes created/destroyed per race. Signal chain: sources → sfxGain → masterGain → destination. Mute/unmute via masterGain for pause. Polls human kart state each frame to detect changes.
 
 ### Data Flow During a Race Frame
 
@@ -149,22 +149,27 @@ Item and pause presses use event-driven pending flags (set on `keydown`, consume
 
 Auto-detected via `ontouchstart` / `maxTouchPoints`. Created in `InputManager.createTouchControls()`. Overlay shown during countdown + racing, hidden on results/menus via `setTouchControlsVisible()`.
 
+- **Top-right**: ⏸ pause button (small, sets `pendingPause` flag)
 - **Left side**: ◀ ▶ steering buttons
 - **Right side**: 💨 drift (large) + 🎁 item (smaller)
 - Touch state merges with keyboard/gamepad in `update()` — all three input sources are additive
 
 ## Hosting
 
-Deployed to GitHub Pages via `.github/workflows/deploy.yml` on every push to `main`. Vite `base: '/Unikart/'` for correct asset paths. Live at https://snebold.dk/Unikart/
+Deployed to GitHub Pages via `.github/workflows/deploy.yml` on every push to `main`. Vite `base: '/Unikart/'` for correct asset paths. Live at https://snebold.dk/Unikart/. Git short hash injected at build time via `__COMMIT_HASH__` (Vite `define`), shown on main menu and pause screen for cache-busting verification.
 
 ## Audio System
 
-Hybrid: Tone.js oscillators for continuous sounds + Kenney CC0 `.mp3` samples for one-shots. Samples in `public/audio/` (converted from OGG to MP3 for Safari/iOS compatibility).
+Pure native Web Audio API — no external audio libraries. Single `AudioContext` for everything (critical for iOS). Samples in `public/audio/` (.mp3 for universal compatibility). Audio mutes on pause via `masterGain`.
 
-| Sound | Source | Trigger |
-|-------|--------|---------|
-| Engine hum | Tone.js sawtooth osc + low-pass | Continuous during race, pitch/volume tracks speed |
-| Drift charge | Tone.js square osc | Held drift, pitch steps per tier (220/330/440 Hz) |
+**Oscillators** (created/destroyed per race):
+- Engine: 3 layered oscillators (sawtooth + square harmonic + triangle sub) → low-pass filter → LFO amplitude modulation → engine bus gain. Pitch/volume/filter track kart speed.
+- Drift charge: square wave oscillator, pitch steps per tier (220/330/440 Hz). Created on drift start, destroyed on release.
+
+**Samples** (loaded via `fetch` + `decodeAudioData` on first interaction):
+
+| Sound | File | Trigger |
+|-------|------|---------|
 | Boost whoosh | `upgrade1.mp3` | Drift released with tier ≥1 |
 | UI click | `click_003.mp3` | Any button press |
 | Item pickup | `pickup2.mp3` | heldItem null → value |
@@ -238,5 +243,5 @@ Detection uses polling: `AudioManager.update()` compares current kart state agai
 | `src/gameplay/race-manager.ts` | 206 | Race orchestration |
 | `src/gameplay/butterfly-system.ts` | 101 | Butterfly spawning, collection, scoring |
 | `src/gameplay/item-system.ts` | 141 | Item box pickup/respawn, usage/effects, toast |
-| `src/audio/audio-manager.ts` | 251 | Tone.js engine + Kenney sample players, state-polling |
+| `src/audio/audio-manager.ts` | 357 | Native Web Audio oscillators + sample players, state-polling |
 | `src/ui/ui-manager.ts` | 484 | All UI screens + HUD + butterfly counter + toasts |
