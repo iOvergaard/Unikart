@@ -5,7 +5,7 @@ import { WALL_BOUNCE_FACTOR, WALL_PUSH_FORCE, KART_BOUNCE_FACTOR } from '../conf
 
 const _tmpVec = new THREE.Vector3();
 
-const GRACE_PERIOD = 2; // seconds after race start with no kart-kart collisions
+const GRACE_PERIOD = 5; // seconds after race start with no kart-kart collisions
 
 /** Handle all collisions for a frame */
 export function resolveCollisions(karts: Kart[], track: Track, raceTime = Infinity): void {
