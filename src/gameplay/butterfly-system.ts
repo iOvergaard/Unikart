@@ -3,10 +3,10 @@ import { Kart } from '../physics/kart';
 import { Track } from '../track/track';
 
 const COLLECTION_RADIUS = 3;
-const CLUSTER_COUNT = 9;          // initial clusters
+const CLUSTER_COUNT = 15;         // initial clusters
 const BUTTERFLIES_PER_CLUSTER = 4;
-const SPAWN_INTERVAL_MIN = 3;     // seconds
-const SPAWN_INTERVAL_MAX = 5;
+const SPAWN_INTERVAL_MIN = 1.5;   // seconds
+const SPAWN_INTERVAL_MAX = 3;
 
 export interface ButterflyInstance {
   id: number;
