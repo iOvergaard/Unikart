@@ -48,13 +48,19 @@ export class UiManager {
   // ── Main Menu ──────────────────────────────────────────
   private buildMainMenu(): void {
     this.overlay.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:linear-gradient(135deg,#ff69b4,#87ceeb,#da70d6)">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:linear-gradient(135deg,#ff69b4,#87ceeb,#da70d6);position:relative">
         <h1 style="font-size:4em;color:#fff;text-shadow:3px 3px 0 #c060a0;margin-bottom:10px;font-family:cursive">
           ✨ Unikart ✨
         </h1>
         <p style="font-size:1.5em;color:#fff;margin-bottom:40px;font-family:cursive">Unicorns Collect Butterflies!</p>
         <button class="menu-btn" data-action="play">🏁 Play!</button>
         <button class="menu-btn" data-action="options">⚙️ Options</button>
+        <div style="margin-top:30px;color:rgba(255,255,255,0.7);font-family:cursive;font-size:0.85em;text-align:left;line-height:1.8">
+          <div>↑ / W — Accelerate &nbsp; ↓ / S — Brake</div>
+          <div>← → / A D — Steer &nbsp; Space — Drift</div>
+          <div>Shift / X — Use Item &nbsp; Esc / P — Pause</div>
+        </div>
+        <div style="position:absolute;bottom:8px;right:12px;color:rgba(255,255,255,0.35);font-family:monospace;font-size:0.7em">${__COMMIT_HASH__}</div>
       </div>
       <style>
         .menu-btn {
@@ -369,7 +375,7 @@ export class UiManager {
   private buildPauseMenu(): void {
     this.overlay.innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;
-                  background:rgba(0,0,0,0.7)">
+                  background:rgba(0,0,0,0.7);position:relative">
         <h2 style="color:#fff;font-family:cursive;font-size:2.5em;margin-bottom:30px">⏸ Paused</h2>
         <button class="menu-btn" data-action="resume">▶ Resume</button>
         <button class="menu-btn" data-action="restart">🔄 Restart</button>
@@ -382,6 +388,7 @@ export class UiManager {
           <div>Shift / X — Use Item</div>
           <div>Esc / P — Pause</div>
         </div>
+        <div style="position:absolute;bottom:8px;right:12px;color:rgba(255,255,255,0.25);font-family:monospace;font-size:0.7em">${__COMMIT_HASH__}</div>
       </div>
     `;
     this.bindButtons();
