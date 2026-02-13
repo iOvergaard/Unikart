@@ -165,7 +165,7 @@ export class RaceManager {
 
   /** Place 8 karts on a 2-wide starting grid */
   private placeOnGrid(): void {
-    const startT = 0.98; // just behind start/finish line
+    const startT = 0.02; // just past start/finish line
     const center = this.track.spline.getPoint(startT);
     const tangent = this.track.spline.getTangent(startT);
     const right = this.track.spline.getRight(startT);
@@ -179,7 +179,7 @@ export class RaceManager {
         .add(tangent.clone().multiplyScalar(-row * 5))
         .add(right.clone().multiplyScalar(col * 3));
 
-      this.karts[i].placeOnGrid(pos, heading);
+      this.karts[i].placeOnGrid(pos, heading, startT);
     }
   }
 

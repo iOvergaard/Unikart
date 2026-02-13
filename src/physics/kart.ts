@@ -196,14 +196,14 @@ export class Kart {
   }
 
   /** Place kart at a grid position for race start */
-  placeOnGrid(position: THREE.Vector3, heading: number): void {
+  placeOnGrid(position: THREE.Vector3, heading: number, splineT: number): void {
     this.position.copy(position);
     this.rotation = heading;
     this.speed = 0;
     this.velocity.set(0, 0, 0);
     this.lap = 0;
-    this.checkpoint = 0;
-    this.lastCheckpoint = 0;
+    this.checkpoint = splineT;
+    this.lastCheckpoint = splineT;
     this.raceProgress = 0;
     this.finished = false;
     this.finishTime = 0;

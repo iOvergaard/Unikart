@@ -143,7 +143,7 @@ export class SceneManager {
   }
 
   private buildStartingGrid(track: Track, add: (obj: THREE.Object3D) => void): void {
-    const startT = 0.98;
+    const startT = 0.02;
     const center = track.spline.getPoint(startT);
     const tangent = track.spline.getTangent(startT);
     const right = track.spline.getRight(startT);
